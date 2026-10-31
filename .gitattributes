@@ -4,3 +4,4 @@ server/** text eol=lf
 *.ttf binary
 *.png binary
 *.jpg binary
+docker-compose.yml text eol=lf

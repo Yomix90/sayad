@@ -25,7 +25,7 @@ Limite : 5 propositions par heure et par adresse IP.
 
 ## Déploiement avec Dokploy
 1. Dans Dokploy : **Create Service → Compose**.
-2. **Provider** : GitHub, dépôt `Yomix90/sayad`, branche `main`, **Compose Path** : `./server/docker-compose.yml`.
+2. **Provider** : GitHub, dépôt `Yomix90/sayad`, branche `main`, **Compose Path** : `./docker-compose.yml` (valeur par défaut, fichier à la racine du dépôt).
 3. **Environment** : ajoutez `ADMIN_TOKEN=` suivi d'un long mot de passe aléatoire (par exemple généré avec `openssl rand -hex 24`).
 4. **Domains** : ajoutez votre domaine (par exemple `api.votresite.com`) sur le service `sayad-api`, **port 8100**, HTTPS activé (Let's Encrypt).
 5. **Deploy**. Vérifiez `https://votre-domaine/health`, puis ouvrez `https://votre-domaine/admin`.

@@ -1,0 +1,20 @@
+# Dokploy (service "Compose"): this file is found with the default
+# Compose Path ./docker-compose.yml. Set ADMIN_TOKEN in Environment, then add
+# your domain on the "sayad-api" service, port 8100.
+services:
+  sayad-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in Dokploy environment}
+      SAYAD_DB: /data/sayad.db
+      OLD_APP_DIR: /data/old_app
+    volumes:
+      - sayad-data:/data
+    expose:
+      - "8100"
+
+volumes:
+  sayad-data:
