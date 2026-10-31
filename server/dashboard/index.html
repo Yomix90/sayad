@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayad · Gestion des spots</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg: #F4F7FA; --surface: #fff; --surface2: #E6F7FB; --text: #0A2540; --muted: #48607A;
+    --accent: #00B4D8; --accent-ink: #075E76; --border: #D7E3EC;
+    --ok: #2BB673; --ok-soft: #E1F5EB; --ok-ink: #0E6B44;
+    --warn: #E8A93D; --warn-soft: #FBF1DC; --warn-ink: #7C5310;
+    --danger: #FF6B4A; --danger-soft: #FFE9E2; --danger-ink: #AE3A1E;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: linear-gradient(158deg, #0A2540 8%, #0E3D63 55%, #0F5B82); color: #EAF6FB; padding: 18px 24px; display: flex; align-items: center; gap: 14px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .2em; }
+  header small { color: #9CC9DC; }
+  header .sp { flex: 1; }
+  button, .btn { font: inherit; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 10px; padding: 8px 14px; cursor: pointer; font-weight: 600; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04222B; }
+  button.ok { background: var(--ok-soft); color: var(--ok-ink); border-color: transparent; }
+  button.danger { background: var(--danger-soft); color: var(--danger-ink); border-color: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  header button { background: rgba(255,255,255,.12); color: #EAF6FB; border-color: rgba(255,255,255,.25); }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: 0 10px 28px rgba(10,37,64,.06); }
+  .card .v { font-size: 30px; font-weight: 800; }
+  .card .l { color: var(--muted); font-size: 13px; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  nav button.on { background: var(--text); color: #fff; border-color: var(--text); }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--text); }
+  input[type=search] { min-width: 240px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  th, td { text-align: start; padding: 9px 10px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; background: #FAFCFD; }
+  td.n { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 700; }
+  .pill.approved { background: var(--ok-soft); color: var(--ok-ink); }
+  .pill.pending { background: var(--warn-soft); color: var(--warn-ink); }
+  .pill.rejected { background: var(--danger-soft); color: var(--danger-ink); }
+  .pill.gold { background: #FFF3C4; color: #7A5B00; }
+  .muted { color: var(--muted); }
+  .actions { white-space: nowrap; }
+  .actions button { padding: 4px 9px; font-size: 13px; }
+  #map { height: 560px; border-radius: var(--radius); border: 1px solid var(--border); }
+  .hidden { display: none !important; }
+  .login { max-width: 380px; margin: 12vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px; }
+  .login h2 { margin-top: 0; }
+  .login input { width: 100%; margin: 10px 0 14px; }
+  dialog { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: min(520px, 94vw); }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  dialog input, dialog textarea, dialog select { width: 100%; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  pre { background: #0A2540; color: #EAF6FB; padding: 12px; border-radius: 10px; overflow: auto; font-size: 12px; }
+  [dir=auto] { unicode-bidi: plaintext; }
+</style>
+</head>
+<body>
+
+<section id="login" class="login">
+  <h2>Sayad · Administration</h2>
+  <p class="muted">Entrez le jeton administrateur (variable <code>ADMIN_TOKEN</code> du serveur).</p>
+  <input id="token" type="password" placeholder="Jeton administrateur" autocomplete="current-password">
+  <button class="primary" id="loginBtn">Se connecter</button>
+  <p id="loginErr" class="muted"></p>
+</section>
+
+<div id="app" class="hidden">
+  <header>
+    <div><h1>SAYAD</h1><small>Gestion des spots et magasins</small></div>
+    <div class="sp"></div>
+    <button id="logout">Déconnexion</button>
+  </header>
+  <main>
+    <div class="cards" id="cards"></div>
+    <nav id="tabs">
+      <button data-tab="pending" class="on">À valider</button>
+      <button data-tab="spots">Spots</button>
+      <button data-tab="shops">Magasins</button>
+      <button data-tab="map">Carte</button>
+      <button data-tab="import">Import</button>
+    </nav>
+
+    <section id="list">
+      <div class="bar">
+        <select id="table"><option value="spots">Spots</option><option value="shops">Magasins</option></select>
+        <select id="status">
+          <option value="">Tous les statuts</option><option value="pending">En attente</option>
+          <option value="approved">Validés</option><option value="rejected">Refusés</option>
+        </select>
+        <input type="search" id="q" placeholder="Rechercher un nom, une info, un téléphone…">
+        <span class="sp" style="flex:1"></span>
+        <button class="ok" data-bulk="approve" disabled>Valider la sélection</button>
+        <button data-bulk="reject" disabled>Refuser</button>
+        <button class="danger" data-bulk="delete" disabled>Supprimer</button>
+        <a class="btn" id="export">Exporter CSV</a>
+      </div>
+      <table>
+        <thead><tr><th><input type="checkbox" id="all"></th><th>#</th><th>Nom</th><th>Position</th><th>Infos</th><th>Source</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="bar" style="margin-top:10px">
+        <button id="prev">← Précédent</button><span id="page" class="muted"></span><button id="next">Suivant →</button>
+      </div>
+    </section>
+
+    <section id="mapTab" class="hidden">
+      <div class="bar">
+        <label><input type="checkbox" id="mSpots" checked> Spots validés</label>
+        <label><input type="checkbox" id="mShops" checked> Magasins validés</label>
+        <label><input type="checkbox" id="mPending" checked> En attente</label>
+      </div>
+      <div id="map"></div>
+    </section>
+
+    <section id="importTab" class="hidden">
+      <div class="card" style="margin-bottom:12px">
+        <b>Dossier scanné :</b> <code id="dir"></code>
+        <p class="muted">Bases SQLite (.db), CSV, JSON ou GeoJSON avec des colonnes nom / latitude / longitude. Les doublons (même nom à moins de 10 m) sont ignorés.</p>
+        <div class="bar">
+          <input type="file" id="upload" accept=".db,.sqlite,.sqlite3,.csv,.json,.geojson">
+          <button id="uploadBtn">Envoyer un fichier</button>
+          <button id="rescan">Actualiser</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Fichier</th><th>Table</th><th>Lignes</th><th>Colonnes</th><th>Importer dans</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="files"></tbody>
+      </table>
+      <h3>Résultat</h3>
+      <pre id="importOut">—</pre>
+    </section>
+  </main>
+</div>
+
+<dialog id="edit">
+  <form method="dialog" id="editForm">
+    <h3 id="editTitle">Modifier</h3>
+    <label>Nom<input name="name" dir="auto" required></label>
+    <div class="grid2">
+      <label>Latitude<input name="lat" type="number" step="any" required></label>
+      <label>Longitude<input name="lon" type="number" step="any" required></label>
+    </div>
+    <div class="spotOnly grid2">
+      <label>Type<select name="kind">
+        <option>other</option><option>rock</option><option>beach</option><option>port</option><option>jetty</option>
+        <option>lake</option><option>river</option><option>dam</option><option>boat</option></select></label>
+      <label>Espèces<input name="species" dir="auto"></label>
+    </div>
+    <div class="shopOnly grid2">
+      <label>Téléphone<input name="phone"></label>
+      <label>Ville<input name="city" dir="auto"></label>
+    </div>
+    <label class="shopOnly"><input type="checkbox" name="gold" style="width:auto"> Magasin doré</label>
+    <label>Description / infos<textarea name="description" rows="3" dir="auto"></textarea></label>
+    <label>Statut<select name="status"><option value="pending">En attente</option><option value="approved">Validé</option><option value="rejected">Refusé</option></select></label>
+    <div class="bar" style="margin-top:16px;justify-content:flex-end">
+      <button value="cancel" formnovalidate>Annuler</button>
+      <button class="primary" value="save" id="saveBtn">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+let token = sessionStorage.getItem('sayadToken') || '';
+const state = { tab: 'pending', table: 'spots', status: 'pending', q: '', offset: 0, limit: 50, total: 0, items: [] };
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'X-Admin-Token': token, ...(opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...(opts.headers || {}) } });
+  if (res.status === 401) { logout(); throw new Error('Session expirée'); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.headers.get('content-type')?.includes('json') ? res.json() : res;
+}
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const statusLabel = { approved: 'Validé', pending: 'En attente', rejected: 'Refusé' };
+
+async function login() {
+  token = $('#token').value.trim() || token;
+  try { await api('/admin/api/stats'); sessionStorage.setItem('sayadToken', token); $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); showTab(state.tab); }
+  catch (e) { $('#loginErr').textContent = 'Jeton refusé.'; }
+}
+function logout() { sessionStorage.removeItem('sayadToken'); token = ''; $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); }
+
+async function loadStats() {
+  const s = await api('/admin/api/stats');
+  const card = (v, l) => `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  $('#cards').innerHTML = card(s.spots.approved, 'Spots validés') + card(s.spots.pending, 'Spots en attente') +
+    card(s.shops.approved, 'Magasins validés') + card(s.shops.pending, 'Magasins en attente') +
+    card(s.spots.rejected + s.shops.rejected, 'Refusés');
+  const pend = s.spots.pending + s.shops.pending;
+  $('[data-tab=pending]').textContent = pend ? `À valider (${pend})` : 'À valider';
+}
+
+async function loadList() {
+  const p = new URLSearchParams({ table: state.table, q: state.q, offset: state.offset, limit: state.limit });
+  if (state.status) p.set('status', state.status);
+  const r = await api('/admin/api/items?' + p);
+  state.total = r.total; state.items = r.items;
+  $('#rows').innerHTML = r.items.map(it => `
+    <tr data-id="${it.id}">
+      <td><input type="checkbox" class="sel"></td>
+      <td class="n">${it.id}</td>
+      <td dir="auto"><b>${esc(it.name)}</b>${it.gold ? ' <span class="pill gold">doré</span>' : ''}${it.species ? `<div class="muted">${esc(it.species)}</div>` : ''}</td>
+      <td class="n"><a href="https://www.openstreetmap.org/?mlat=${it.lat}&mlon=${it.lon}#map=15/${it.lat}/${it.lon}" target="_blank" rel="noopener">${(+it.lat).toFixed(4)}, ${(+it.lon).toFixed(4)}</a></td>
+      <td dir="auto" class="muted">${esc(it.phone || '')} ${esc((it.description || '').slice(0, 90))}</td>
+      <td class="muted">${esc(it.source)}</td>
+      <td><span class="pill ${it.status}">${statusLabel[it.status]}</span></td>
+      <td class="actions">
+        ${it.status !== 'approved' ? '<button class="ok" data-act="approve">✓</button>' : ''}
+        ${it.status !== 'rejected' ? '<button data-act="reject">✕</button>' : ''}
+        <button data-act="edit">Modifier</button>
+        <button class="danger" data-act="delete">🗑</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="8" class="muted">Aucun élément.</td></tr>';
+  const page = Math.floor(state.offset / state.limit) + 1, pages = Math.max(1, Math.ceil(state.total / state.limit));
+  $('#page').textContent = `Page ${page} / ${pages} · ${state.total} éléments`;
+  $('#prev').disabled = state.offset === 0; $('#next').disabled = state.offset + state.limit >= state.total;
+  $('#all').checked = false; updateBulk();
+  $('#export').onclick = async () => {
+    const res = await api(`/admin/api/export/${state.table}.csv`);
+    const url = URL.createObjectURL(await res.blob());
+    Object.assign(document.createElement('a'), { href: url, download: `${state.table}.csv` }).click();
+  };
+}
+function selectedIds() { return $$('.sel:checked').map(c => +c.closest('tr').dataset.id); }
+function updateBulk() { const n = selectedIds().length; $$('[data-bulk]').forEach(b => b.disabled = !n); }
+
+async function bulk(action, ids) {
+  if (action === 'delete' && !confirm(`Supprimer ${ids.length} élément(s) définitivement ?`)) return;
+  const r = await api(`/admin/api/${state.table}/bulk`, { method: 'POST', body: JSON.stringify({ ids, action }) });
+  toast(`${r.changed} élément(s) modifié(s)`); refresh();
+}
+
+function openEdit(it) {
+  const f = $('#editForm');
+  $('#editTitle').textContent = `Modifier · ${state.table === 'spots' ? 'spot' : 'magasin'} #${it.id}`;
+  $$('.spotOnly').forEach(e => e.classList.toggle('hidden', state.table !== 'spots'));
+  $$('.shopOnly').forEach(e => e.classList.toggle('hidden', state.table !== 'shops'));
+  for (const el of f.elements) {
+    if (!el.name) continue;
+    if (el.type === 'checkbox') el.checked = !!it[el.name]; else el.value = it[el.name] ?? '';
+  }
+  $('#edit').showModal();
+  $('#edit').onclose = async () => {
+    if ($('#edit').returnValue !== 'save') return;
+    const body = {};
+    for (const el of f.elements) {
+      if (!el.name || el.closest('.hidden')) continue;
+      body[el.name] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+    }
+    try { await api(`/admin/api/${state.table}/${it.id}`, { method: 'PUT', body: JSON.stringify(body) }); toast('Enregistré'); refresh(); }
+    catch (e) { toast('Erreur : ' + e.message); }
+  };
+}
+
+// --- Map ---
+let map, layer;
+async function loadMap() {
+  if (!map) {
+    map = L.map('map').setView([31.8, -7.5], 6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+  }
+  setTimeout(() => map.invalidateSize(), 50);
+  layer.clearLayers();
+  const add = (items, color, kind) => items.forEach(it => L.circleMarker([it.lat, it.lon], { radius: 5, color, weight: 1, fillOpacity: .8 })
+    .bindPopup(`<b dir="auto">${esc(it.name)}</b><br>${kind} · ${statusLabel[it.status]}${it.phone ? '<br>' + esc(it.phone) : ''}`).addTo(layer));
+  const get = (table, status) => api(`/admin/api/items?table=${table}&status=${status}&limit=500&offset=0`).then(r => r.items);
+  const fetchAll = async (table, status) => {
+    let out = [], offset = 0;
+    for (;;) {
+      const r = await api(`/admin/api/items?table=${table}&status=${status}&limit=500&offset=${offset}`);
+      out = out.concat(r.items); offset += 500;
+      if (offset >= r.total) return out;
+    }
+  };
+  if ($('#mSpots').checked) add(await fetchAll('spots', 'approved'), '#00B4D8', 'Spot');
+  if ($('#mShops').checked) add(await fetchAll('shops', 'approved'), '#E8A93D', 'Magasin');
+  if ($('#mPending').checked) { add(await get('spots', 'pending'), '#FF6B4A', 'Spot'); add(await get('shops', 'pending'), '#FF6B4A', 'Magasin'); }
+}
+
+// --- Import ---
+async function loadFiles() {
+  const r = await api('/admin/api/import/files');
+  $('#dir').textContent = r.dir;
+  $('#files').innerHTML = r.files.map((f, i) => `
+    <tr data-i="${i}">
+      <td>${esc(f.file)}${f.error ? `<div class="muted">${esc(f.error)}</div>` : ''}</td>
+      <td>${esc(f.table || '—')}</td>
+      <td class="n">${f.rows}</td>
+      <td class="muted" style="font-size:12px">${esc(f.columns.join(', '))}</td>
+      <td><select class="into"><option value="spots" ${f.target === 'spots' ? 'selected' : ''}>Spots</option><option value="shops" ${f.target === 'shops' ? 'selected' : ''}>Magasins</option></select></td>
+      <td><select class="st"><option value="approved">Validés</option><option value="pending">En attente</option></select></td>
+      <td class="actions"><button data-imp="dry">Aperçu</button> <button class="primary" data-imp="run">Importer</button></td>
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">Aucun fichier importable dans ce dossier.</td></tr>';
+  $('#files').onclick = async e => {
+    const b = e.target.closest('[data-imp]'); if (!b) return;
+    const tr = b.closest('tr'), f = r.files[+tr.dataset.i];
+    const dry = b.dataset.imp === 'dry';
+    if (!dry && !confirm(`Importer ${f.rows} lignes de ${f.file}${f.table ? ' (' + f.table + ')' : ''} ?`)) return;
+    b.disabled = true;
+    try {
+      const out = await api('/admin/api/import', { method: 'POST', body: JSON.stringify({ file: f.file, table: f.table, into: tr.querySelector('.into').value, status: tr.querySelector('.st').value, dry_run: dry }) });
+      $('#importOut').textContent = JSON.stringify(out, null, 2);
+      if (!dry) { toast(`${out.inserted} importés · ${out.duplicates} doublons ignorés`); loadStats(); }
+    } catch (err) { $('#importOut').textContent = 'Erreur : ' + err.message; }
+    b.disabled = false;
+  };
+}
+
+function showTab(tab) {
+  state.tab = tab;
+  $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  $('#list').classList.toggle('hidden', !['pending', 'spots', 'shops'].includes(tab));
+  $('#mapTab').classList.toggle('hidden', tab !== 'map');
+  $('#importTab').classList.toggle('hidden', tab !== 'import');
+  if (tab === 'pending') { state.status = 'pending'; }
+  if (tab === 'spots' || tab === 'shops') { state.table = tab; state.status = ''; }
+  $('#table').value = state.table; $('#status').value = state.status; state.offset = 0;
+  refresh();
+}
+async function refresh() {
+  try {
+    await loadStats();
+    if (state.tab === 'map') await loadMap();
+    else if (state.tab === 'import') await loadFiles();
+    else await loadList();
+  } catch (e) { toast(e.message); }
+}
+
+// --- Events ---
+$('#loginBtn').onclick = login;
+$('#token').onkeydown = e => e.key === 'Enter' && login();
+$('#logout').onclick = logout;
+$('#tabs').onclick = e => e.target.dataset.tab && showTab(e.target.dataset.tab);
+$('#table').onchange = e => { state.table = e.target.value; state.offset = 0; loadList(); };
+$('#status').onchange = e => { state.status = e.target.value; state.offset = 0; loadList(); };
+let qTimer; $('#q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = e.target.value; state.offset = 0; loadList(); }, 300); };
+$('#prev').onclick = () => { state.offset = Math.max(0, state.offset - state.limit); loadList(); };
+$('#next').onclick = () => { state.offset += state.limit; loadList(); };
+$('#all').onchange = e => { $$('.sel').forEach(c => c.checked = e.target.checked); updateBulk(); };
+$('#rows').onchange = e => e.target.classList.contains('sel') && updateBulk();
+$('#rows').onclick = async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = +b.closest('tr').dataset.id, it = state.items.find(x => x.id === id);
+  if (b.dataset.act === 'edit') return openEdit(it);
+  await bulk(b.dataset.act, [id]);
+};
+$$('[data-bulk]').forEach(b => b.onclick = () => bulk(b.dataset.bulk, selectedIds()));
+['#mSpots', '#mShops', '#mPending'].forEach(s => $(s).onchange = loadMap);
+$('#rescan').onclick = loadFiles;
+$('#uploadBtn').onclick = async () => {
+  const f = $('#upload').files[0]; if (!f) return toast('Choisissez un fichier');
+  const fd = new FormData(); fd.append('file', f);
+  try { const r = await api('/admin/api/import/upload', { method: 'POST', body: fd }); toast('Envoyé : ' + r.saved); loadFiles(); }
+  catch (e) { toast('Erreur : ' + e.message); }
+};
+if (token) login();
+</script>
+</body>
+</html>

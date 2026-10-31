@@ -1,0 +1,15 @@
+[Unit]
+Description=Sayad spots API
+After=network.target
+
+[Service]
+User=sayad
+WorkingDirectory=/opt/sayad/server
+Environment=SAYAD_DB=/var/lib/sayad/sayad.db
+# Put ADMIN_TOKEN=... in this file (chmod 600), not here.
+EnvironmentFile=/etc/sayad.env
+ExecStart=/opt/sayad/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8100 --proxy-headers
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,330 @@
+{
+  "@@locale": "fr",
+  "appTitle": "Sayad",
+  "tabToday": "Aujourd'hui",
+  "tabMap": "Carte",
+  "tabPrayer": "Prière",
+  "tabSettings": "Réglages",
+  "loading": "Chargement…",
+  "retry": "Réessayer",
+  "errorLoad": "Impossible de charger les données. Vérifiez votre connexion.",
+  "locationDenied": "Localisation refusée : position par défaut utilisée (Casablanca).",
+  "fishingIndex": "Indice de pêche",
+  "fishingPoor": "Faible",
+  "fishingFair": "Moyen",
+  "fishingGood": "Bon",
+  "fishingExcellent": "Excellent",
+  "weather": "Météo",
+  "sea": "Mer",
+  "wind": "Vent",
+  "gusts": "Rafales",
+  "pressure": "Pression",
+  "temperature": "Température",
+  "waves": "Vagues",
+  "wavePeriod": "Période",
+  "waterTemp": "Eau",
+  "tides": "Marées",
+  "highTide": "Pleine mer",
+  "lowTide": "Basse mer",
+  "noMarineData": "Pas de données marines pour ce point (zone terrestre).",
+  "sunMoon": "Soleil et lune",
+  "sunrise": "Lever du soleil",
+  "sunset": "Coucher du soleil",
+  "moonPhase": "Phase de lune",
+  "illumination": "Illumination",
+  "moonNew": "Nouvelle lune",
+  "moonWaxingCrescent": "Premier croissant",
+  "moonFirstQuarter": "Premier quartier",
+  "moonWaxingGibbous": "Gibbeuse croissante",
+  "moonFull": "Pleine lune",
+  "moonWaningGibbous": "Gibbeuse décroissante",
+  "moonLastQuarter": "Dernier quartier",
+  "moonWaningCrescent": "Dernier croissant",
+  "next24h": "Prochaines 24 h",
+  "mySpots": "Mes spots",
+  "addSpotHint": "Appui long sur la carte pour ajouter un spot",
+  "addSpot": "Ajouter un spot",
+  "spotName": "Nom du spot",
+  "cancel": "Annuler",
+  "save": "Enregistrer",
+  "delete": "Supprimer",
+  "forecastHere": "Prévisions ici",
+  "myPosition": "Ma position",
+  "prayerTimes": "Heures de prière",
+  "fajr": "Fajr",
+  "sunrisePrayer": "Chourouq",
+  "dhuhr": "Dhohr",
+  "asr": "Asr",
+  "maghrib": "Maghrib",
+  "isha": "Icha",
+  "qibla": "Direction de la qibla",
+  "qiblaDegrees": "{deg}° depuis le nord",
+  "@qiblaDegrees": {
+    "placeholders": {
+      "deg": {
+        "type": "String"
+      }
+    }
+  },
+  "language": "Langue",
+  "systemLanguage": "Langue du système",
+  "about": "À propos",
+  "dataSources": "Données : Open-Meteo (météo et mer), OpenStreetMap et OpenSeaMap (cartes). Les marées sont un modèle : ne les utilisez pas pour la navigation.",
+  "kmh": "km/h",
+  "hpa": "hPa",
+  "meters": "m",
+  "seconds": "s",
+  "tabForecast": "Prévisions",
+  "tabTools": "Outils",
+  "hour": "Heure",
+  "humidity": "Humidité",
+  "current": "Courant",
+  "tidalRange": "Marnage",
+  "tidesDisclaimer": "Les marées viennent d'un modèle mondial et peuvent différer de la réalité près des côtes. Ne pas utiliser pour la navigation.",
+  "solunarCalendar": "Calendrier solunaire",
+  "solunarHelp": "Périodes majeures : lune au zénith ou au nadir (2 h). Périodes mineures : lever et coucher de la lune (1 h). Horaires approximatifs.",
+  "major": "Majeure",
+  "minor": "Mineure",
+  "compass": "Boussole",
+  "noCompassSensor": "Votre téléphone n'a pas de capteur de boussole.",
+  "compassHelp": "Tenez le téléphone à plat, loin du métal. Pour calibrer, faites un 8 avec le téléphone.",
+  "knots": "Nœuds de pêche",
+  "species": "Espèces",
+  "inSeason": "en saison",
+  "sizeDisclaimer": "Les tailles minimales sont indicatives. Vérifiez la réglementation locale avant de garder un poisson.",
+  "bestSeason": "Meilleurs mois",
+  "habitat": "Habitat",
+  "bait": "Appâts",
+  "technique": "Technique",
+  "minSize": "Taille minimale",
+  "catchLog": "Journal de pêche",
+  "addCatch": "Ajouter une prise",
+  "noCatches": "Aucune prise pour l'instant. Enregistrez vos prises pour découvrir vos meilleures conditions.",
+  "statistics": "Statistiques",
+  "totalCatches": "Prises",
+  "biggestCatch": "La plus lourde",
+  "topSpecies": "Espèce n°1",
+  "otherSpecies": "Autre espèce…",
+  "speciesName": "Nom de l'espèce",
+  "weightKg": "Poids (kg)",
+  "lengthCm": "Taille (cm)",
+  "note": "Note (appât, technique…)",
+  "catchAutoInfo": "La date, la position, le vent, les vagues et la phase de lune sont enregistrés automatiquement.",
+  "placesNearby": "Magasins et ports proches",
+  "placesError": "Impossible de charger les lieux. Réessayez plus tard.",
+  "fishingShop": "Magasin de pêche",
+  "port": "Port",
+  "marina": "Marina",
+  "slipway": "Cale de mise à l'eau",
+  "seeAll": "Tout voir",
+  "placesFound": "{count, plural, =0{Aucun lieu trouvé ici} =1{1 lieu trouvé} other{{count} lieux trouvés}}",
+  "@placesFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "subtitle": "Guide du pêcheur",
+  "changeTheme": "Changer de thème",
+  "morocco": "Maroc",
+  "gpsOn": "GPS actif",
+  "gpsOff": "GPS coupé",
+  "condPoor": "Conditions faibles",
+  "condFair": "Conditions moyennes",
+  "condGood": "Bonnes conditions",
+  "condExcellent": "Excellentes conditions",
+  "majorNow": "Période majeure en cours jusqu'à {end}.",
+  "@majorNow": {
+    "placeholders": {
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "nextMajor": "Prochaine période majeure : {range}.",
+  "@nextMajor": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
+  "indexNote": "L'activité dépend de la lune, de la pression, du vent et de la mer.",
+  "pressureRising": "En hausse (+{v})",
+  "@pressureRising": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "pressureFalling": "En baisse (−{v})",
+  "@pressureFalling": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "pressureSteady": "Stable",
+  "solunarTable": "Table solunaire",
+  "h24": "24 h",
+  "majorPeriod": "Période majeure",
+  "minorPeriod": "Période mineure",
+  "swell": "Houle",
+  "noMarineShort": "Pas de données marines",
+  "surfaceTemp": "Température de surface",
+  "airTemp": "Air",
+  "wxClear": "Dégagé",
+  "wxCloudy": "Nuageux",
+  "wxFog": "Brouillard",
+  "wxRain": "Pluie",
+  "wxSnow": "Neige",
+  "wxStorm": "Orage",
+  "sun": "Soleil",
+  "moon": "Lune",
+  "rise": "Lever",
+  "set": "Coucher",
+  "days7": "7 jours",
+  "hwShort": "PM",
+  "lwShort": "BM",
+  "nextTide": "Prochaine marée",
+  "inDuration": "dans {d}",
+  "@inDuration": {
+    "placeholders": {
+      "d": {
+        "type": "String"
+      }
+    }
+  },
+  "upcoming": "À venir",
+  "marineForecast": "Prévisions marines",
+  "bestWindow": "Meilleur créneau : {range} · mer {state}",
+  "@bestWindow": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      },
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "temperatureShort": "Temp.",
+  "calm": "Calme",
+  "moderate": "Modérée",
+  "rough": "Agitée",
+  "spotsCount": "{count, plural, =0{Aucun spot} =1{1 spot} other{{count} spots}}",
+  "@spotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectedPoint": "Point sélectionné",
+  "pointKind": "Point de la carte",
+  "mySpot": "Mon spot",
+  "all": "Tous",
+  "placesFilter": "Magasins & ports",
+  "saved": "Sauvegardé",
+  "direct": "Directe",
+  "coords": "Position",
+  "navigate": "Naviguer",
+  "spotSaved": "Spot sauvegardé ✓",
+  "guide": "Guide",
+  "knotsAndHooks": "Nœuds & hameçons",
+  "knotsShort": "Nœuds",
+  "hooks": "Hameçons",
+  "use": "Usage",
+  "difficulty": "Difficulté",
+  "easy": "Facile",
+  "medium": "Moyen",
+  "steps": "Étapes",
+  "tip": "Conseil du pêcheur",
+  "speciesSub": "Saisons, appâts et techniques",
+  "solunarSub": "30 jours de périodes",
+  "catchLogSub": "Vos prises et leurs conditions",
+  "compassSub": "Cap et qibla",
+  "prayerSub": "Selon votre position",
+  "settingsSub": "Langue, thème, région",
+  "stepOf": "Étape {a} / {b}",
+  "@stepOf": {
+    "placeholders": {
+      "a": {
+        "type": "int"
+      },
+      "b": {
+        "type": "int"
+      }
+    }
+  },
+  "later": "Plus tard",
+  "continueLabel": "Continuer",
+  "start": "Commencer",
+  "chooseLanguage": "Choisissez votre langue",
+  "chooseLanguageSub": "L'interface et le guide sont entièrement traduits.",
+  "chooseRegion": "Votre région de pêche",
+  "chooseRegionSub": "Elle sert pour les prévisions et les marées quand le GPS est coupé.",
+  "useGps": "Utiliser ma position GPS",
+  "useGpsSub": "Le plus précis, surtout en mer",
+  "chooseStyle": "Choisissez le style",
+  "chooseStyleSub": "Modifiable à tout moment avec le bouton en haut de l'écran.",
+  "styleModern": "Moderne",
+  "styleModernSub": "Bleu océan, clair et lisible",
+  "styleClassic": "Ancien",
+  "styleClassicSub": "Carte marine ancienne sur parchemin",
+  "appearance": "Apparence",
+  "fishingRegion": "Région de pêche",
+  "replayWelcome": "Revoir l'écran d'accueil",
+  "loadingTides": "Lecture des marées…",
+  "loadingMoon": "Calcul de la lune…",
+  "loadingSpots": "Préparation des spots…",
+  "tideSourcePrecise": "Prévisions précises (WorldTides)",
+  "tideSourceModel": "Modèle approximatif (écart possible de 1 à 2 h)",
+  "tidesDisclaimerPrecise": "Hauteurs au-dessus du zéro des cartes (plus basse mer astronomique), comme les annuaires de marée. Pour la navigation, utilisez toujours les documents officiels.",
+  "tideSourceStormglass": "Prévisions précises (Stormglass)",
+  "tideSourceCorrected": "Précis : corrigé sur la table du port de {port}",
+  "tideSourceUncalibrated": "Stormglass non calibré ici (écart possible jusqu'à 1 h)",
+  "@tideSourceCorrected": {
+    "placeholders": {
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "chooseCity": "Choisir une ville côtière",
+  "searchCity": "Rechercher une ville…",
+  "noCityFound": "Aucune ville trouvée.",
+  "changeCity": "Appuyez pour changer de ville",
+  "coastMediterranean": "Méditerranée",
+  "coastAtlanticNorth": "Atlantique nord",
+  "coastAtlanticCentre": "Atlantique centre",
+  "coastSouss": "Souss",
+  "coastSahara": "Sahara",
+  "targetDistance": "Distance jusqu'au spot",
+  "targetBearing": "Cap",
+  "targetSpot": "Spot visé",
+  "waitingGps": "Recherche du signal GPS…",
+  "targetHelp": "Suivez la flèche. Fonctionne sans internet ni carte, avec le GPS et la boussole seulement.",
+  "targetNoCompass": "Pas de boussole : tenez le téléphone le haut vers le nord.",
+  "guideOffline": "Guider (hors ligne)",
+  "springTide": "Vives-eaux (حمل)",
+  "neapTide": "Mortes-eaux (كساد)",
+  "midTide": "Marée moyenne",
+  "hijriCalendar": "Calendrier hégirien",
+  "hijriHelp": "Le Maroc suit l'observation du croissant, souvent un jour après le calcul. Choisissez la date correcte.",
+  "hijriMorocco": "Maroc (par défaut)",
+  "hijriUmmAlQura": "Calcul (Umm al-Qura)",
+  "weatherMap": "Carte météo",
+  "weatherMapSub": "Vent, vagues, pluie animés",
+  "tips": "Conseils",
+  "tipsSub": "Moments de pêche, marées, sécurité",
+  "communitySpots": "Spots de pêche",
+  "communitySpot": "Spot de pêche",
+  "shareSpot": "Partager avec tous",
+  "shareSpotSub": "Visible après validation",
+  "spotShared": "Envoyé, en attente de validation ✓",
+  "spotShareFailed": "Envoi impossible, réessayez plus tard"
+}
