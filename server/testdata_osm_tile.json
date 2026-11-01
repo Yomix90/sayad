@@ -1,0 +1,6 @@
+[
+  {"type": "way", "id": 1, "center": {"lat": 33.719, "lon": -7.367}, "tags": {"natural": "beach", "name": "Plage Des Sablettes"}},
+  {"type": "node", "id": 2, "lat": 33.605, "lon": -7.61, "tags": {"man_made": "pier"}},
+  {"type": "way", "id": 3, "center": {"lat": 33.61, "lon": -7.62}, "tags": {"harbour": "yes", "name": "Port de pêche"}},
+  {"type": "node", "id": 4, "lat": 33.6, "lon": -7.6, "tags": {"amenity": "cafe"}}
+]

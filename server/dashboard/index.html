@@ -136,6 +136,15 @@
 
     <section id="importTab" class="hidden">
       <div class="card" style="margin-bottom:12px">
+        <b>OpenStreetMap</b>
+        <p class="muted">Importe automatiquement les jetées, digues, plages, caps, cales, ports et spots de pêche de toute la côte marocaine, avec leur vraie position. Dure environ 10 minutes. Les lieux déjà importés sont ignorés. Données © contributeurs OpenStreetMap (licence ODbL).</p>
+        <div class="bar">
+          <select id="osmStatus"><option value="pending">Importer en attente (à valider)</option><option value="approved">Importer directement validés</option></select>
+          <button class="primary" id="osmBtn">Importer depuis OpenStreetMap</button>
+          <span id="osmProgress" class="muted"></span>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
         <b>Dossier scanné :</b> <code id="dir"></code>
         <p class="muted">Bases SQLite (.db), CSV, JSON ou GeoJSON avec des colonnes nom / latitude / longitude. Les doublons (même nom à moins de 10 m) sont ignorés.</p>
         <div class="bar">
@@ -348,6 +357,7 @@ async function loadMap() {
 
 // --- Import ---
 async function loadFiles() {
+  api('/admin/api/import/osm').then(showOsm).catch(() => {});
   const r = await api('/admin/api/import/files');
   $('#dir').textContent = r.dir;
   $('#files').innerHTML = r.files.map((f, i) => `
@@ -424,6 +434,23 @@ $('#area').onchange = e => { state.area = e.target.value; state.offset = 0; load
 $('#limit').onchange = e => { state.limit = +e.target.value; state.offset = 0; loadList(); };
 ['#mSpots', '#mShops', '#mPending'].forEach(s => $(s).onchange = loadMap);
 $('#rescan').onclick = loadFiles;
+let osmTimer;
+function showOsm(st) {
+  const kinds = Object.entries(st.by_kind || {}).map(([k, v]) => `${k} ${v}`).join(', ');
+  $('#osmProgress').textContent = st.running
+    ? `En cours : zone ${st.done}/${st.total} · ${st.inserted} ajoutés · ${st.duplicates} déjà présents`
+    : st.finished_at
+      ? `Terminé : ${st.inserted} ajoutés, ${st.duplicates} déjà présents${kinds ? ' (' + kinds + ')' : ''}${st.errors.length ? ' · ' + st.errors.length + ' zone(s) en erreur, relancez plus tard' : ''}`
+      : '';
+  $('#osmBtn').disabled = st.running;
+  clearTimeout(osmTimer);
+  if (st.running) osmTimer = setTimeout(async () => { showOsm(await api('/admin/api/import/osm')); loadStats(); }, 4000);
+}
+$('#osmBtn').onclick = async () => {
+  if (!confirm('Lancer l'import OpenStreetMap de toute la côte (environ 10 minutes) ?')) return;
+  try { showOsm(await api('/admin/api/import/osm', { method: 'POST', body: JSON.stringify({ status: $('#osmStatus').value }) })); }
+  catch (e) { toast('Erreur : ' + e.message); }
+};
 $('#uploadBtn').onclick = async () => {
   const f = $('#upload').files[0]; if (!f) return toast('Choisissez un fichier');
   const fd = new FormData(); fd.append('file', f);

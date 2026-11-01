@@ -136,6 +136,25 @@ def test_select_all_by_filter():
     assert client.get('/admin/api/items', headers=ADMIN, params={'table': 'spots', 'limit': 20000}).status_code == 200
 
 
+def test_osm_import():
+    import json
+    import osm_import
+    tile = json.load(open(os.path.join(os.path.dirname(__file__), 'testdata_osm_tile.json'), encoding='utf-8'))
+    osm_import.run(server.DB_PATH, 'pending', tiles=[(0, 0, 1, 1)], fetch=lambda _: tile, pause=0)
+    st = osm_import.status()
+    assert not st['running'] and st['errors'] == []
+    assert st['inserted'] == 3 and st['by_kind'] == {'jetty': 1, 'beach': 1, 'port': 1}
+    items = client.get('/admin/api/items', headers=ADMIN, params={'table': 'spots', 'source': 'osm'}).json()
+    names = sorted(i['name'] for i in items['items'])
+    assert names == ['Plage Des Sablettes', 'Port de pêche', 'رصيف - Jetée']
+    assert all(i['status'] == 'pending' for i in items['items'])
+    # Running again adds nothing (same OSM ids).
+    osm_import.run(server.DB_PATH, 'pending', tiles=[(0, 0, 1, 1)], fetch=lambda _: tile, pause=0)
+    assert osm_import.status()['inserted'] == 0 and osm_import.status()['duplicates'] == 3
+    assert client.get('/admin/api/import/osm').status_code == 401
+    assert client.get('/admin/api/import/osm', headers=ADMIN).json()['done'] == 1
+
+
 if __name__ == '__main__':
     for name, fn in list(globals().items()):
         if name.startswith('test_'):

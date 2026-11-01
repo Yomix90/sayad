@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 import importer
+import osm_import
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('SAYAD_DB', os.path.join(HERE, 'sayad.db'))
@@ -65,7 +66,8 @@ CREATE INDEX IF NOT EXISTS shops_pos ON shops(status, lat, lon);
 
 # Columns added after the first version: added to existing databases.
 MIGRATIONS = {
-    'spots': {'icon': "TEXT NOT NULL DEFAULT ''", 'image_url': "TEXT NOT NULL DEFAULT ''"},
+    'spots': {'icon': "TEXT NOT NULL DEFAULT ''", 'image_url': "TEXT NOT NULL DEFAULT ''",
+              'ext_id': "TEXT NOT NULL DEFAULT ''"},
     'shops': {'description': "TEXT NOT NULL DEFAULT ''", 'icon': "TEXT NOT NULL DEFAULT ''"},
 }
 
@@ -84,6 +86,7 @@ def init_db(path: Optional[str] = None) -> None:
             for col, decl in cols.items():
                 if col not in have:
                     c.execute(f'ALTER TABLE {table} ADD COLUMN {col} {decl}')
+        c.execute('CREATE INDEX IF NOT EXISTS spots_ext ON spots(ext_id)')
 
 
 @contextmanager
@@ -405,6 +408,23 @@ async def upload(file: UploadFile = File(...)):
     with open(os.path.join(folder, name), 'wb') as f:
         f.write(data)
     return {'saved': f'uploads/{name}'}
+
+
+# --- Import from OpenStreetMap -------------------------------------------------
+class OsmReq(BaseModel):
+    status: Literal['approved', 'pending'] = 'pending'
+
+
+@app.post('/admin/api/import/osm', dependencies=admin)
+def osm_start(req: OsmReq):
+    if not osm_import.start(DB_PATH, req.status):
+        raise HTTPException(409, 'An OpenStreetMap import is already running')
+    return osm_import.status()
+
+
+@app.get('/admin/api/import/osm', dependencies=admin)
+def osm_status():
+    return osm_import.status()
 
 
 # --- Former review routes, kept for compatibility -----------------------------
