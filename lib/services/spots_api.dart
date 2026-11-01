@@ -69,6 +69,22 @@ class SpotsApi {
 
   Future<List<ServerSpot>> shops(LatLng sw, LatLng ne) => _list('/shops', sw, ne);
 
+  /// Proposes a tackle shop; it appears once the admin approves it.
+  Future<void> submitShop(String name, LatLng at, {String phone = '', String city = ''}) async {
+    final res = await _client
+        .post(Uri.parse('$_base/shops'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'name': name,
+              'lat': at.latitude,
+              'lon': at.longitude,
+              'phone': phone,
+              'city': city,
+            }))
+        .timeout(const Duration(seconds: 20));
+    if (res.statusCode != 201) throw Exception('Spots server ${res.statusCode}');
+  }
+
   /// Proposes a spot to everyone; it appears once the admin approves it.
   Future<void> submitSpot(String name, LatLng at, {String kind = 'other'}) async {
     final res = await _client

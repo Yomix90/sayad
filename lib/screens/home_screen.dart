@@ -7,7 +7,9 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../l10n/app_localizations.dart';
 import '../services/app_state.dart';
 import '../services/astro.dart';
+import '../services/ephemeris.dart';
 import '../services/forecast_service.dart';
+import '../services/widget_service.dart';
 import '../services/hijri.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -24,6 +26,7 @@ class HomeScreen extends StatelessWidget {
       key: ValueKey(state.position),
       position: state.position,
       header: const _LocationRow(),
+      feedsWidget: true,
     );
   }
 }
@@ -100,10 +103,14 @@ String formatCoords(double lat, double lon) =>
 /// Full forecast for one point: fishing index, solunar strip, weather
 /// tiles, sun and moon.
 class ForecastView extends StatefulWidget {
-  const ForecastView({super.key, required this.position, this.header});
+  const ForecastView(
+      {super.key, required this.position, this.header, this.feedsWidget = false});
 
   final LatLng position;
   final Widget? header;
+
+  /// The home screen's view also refreshes the Android home-screen widget.
+  final bool feedsWidget;
 
   @override
   State<ForecastView> createState() => _ForecastViewState();
@@ -111,6 +118,7 @@ class ForecastView extends StatefulWidget {
 
 class _ForecastViewState extends State<ForecastView> {
   late Future<Forecast> _future;
+  bool _widgetSent = false;
 
   @override
   void initState() {
@@ -169,7 +177,7 @@ class _ForecastViewState extends State<ForecastView> {
     final sun = prayerTimes(lat, lon);
     final score = (fishingIndex(f, moon, sun, now) * 10).round();
     final periods = solunarPeriods(lat, lon, now);
-    final (moonRise, moonSet) = moonRiseSet(lat, lon, now);
+    final (moonRise, moonSet) = moonRiseSetExact(lat, lon, now);
 
     final (condLabel, condTone) = score < 40
         ? (t.condPoor, ChipTone.danger)
@@ -183,6 +191,20 @@ class _ForecastViewState extends State<ForecastView> {
         .where((x) => x.major && !now.isBefore(x.start) && now.isBefore(x.end))
         .firstOrNull;
     final next = periods.where((x) => x.major && x.start.isAfter(now)).firstOrNull;
+    if (widget.feedsWidget && !_widgetSent) {
+      _widgetSent = true;
+      final state = AppScope.of(context);
+      updateHomeWidget(
+        t: t,
+        locale: locale,
+        place: state.usingGps ? t.myPosition : state.region.name.of(context),
+        forecast: f,
+        score: score,
+        scoreLabel: condLabel,
+        lat: lat,
+        lon: lon,
+      );
+    }
     final note = current != null
         ? t.majorNow(hm.format(current.end))
         : next != null
@@ -224,7 +246,7 @@ class _ForecastViewState extends State<ForecastView> {
               day: now,
               sunrise: sun.sunrise,
               sunset: sun.maghrib,
-              moonRise: moonRise,
+              moonRise: moonRise ?? now.subtract(const Duration(days: 2)),
             ),
             const SizedBox(height: 10),
             Wrap(spacing: 16, runSpacing: 6, children: [
@@ -308,8 +330,8 @@ class _ForecastViewState extends State<ForecastView> {
                     icon: 'moon',
                     title: t.moon,
                     rows: [
-                      (t.rise, '≈ ${hm.format(moonRise)}'),
-                      (t.set, '≈ ${hm.format(moonSet)}'),
+                      (t.rise, moonRise == null ? '—' : hm.format(moonRise)),
+                      (t.set, moonSet == null ? '—' : hm.format(moonSet)),
                     ],
                   ),
                 ),

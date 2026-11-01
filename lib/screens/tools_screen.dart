@@ -4,11 +4,13 @@ import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/line_icons.dart';
+import 'big_tides_screen.dart';
 import 'catch_log_screen.dart';
 import 'compass_screen.dart';
 import 'guides_screens.dart';
 import 'prayer_screen.dart';
 import 'settings_screen.dart';
+import 'sky_screen.dart';
 import 'solunar_screen.dart';
 import 'weather_map_screen.dart';
 
@@ -26,6 +28,8 @@ class ToolsScreen extends StatelessWidget {
       (LineIcon('book', size: 30, color: ink), t.guide, t.knotsAndHooks, const GuideScreen()),
       (LineIcon('info', size: 30, color: ink), t.tips, t.tipsSub, const TipsScreen()),
       (LineIcon('fish', size: 30, color: ink), t.species, t.speciesSub, const SpeciesScreen()),
+      (LineIcon('waves', size: 30, color: ink), t.bigTides, t.bigTidesSub, const BigTidesScreen()),
+      (LineIcon('sun', size: 30, color: ink), t.sky, t.skySub, const SkyScreen()),
       (LineIcon('moon', size: 30, color: ink), t.solunarCalendar, t.solunarSub, const SolunarScreen()),
       (LineIcon('bookmark', size: 30, color: ink), t.catchLog, t.catchLogSub, const CatchLogScreen()),
       (LineIcon('compass', size: 30, color: ink), t.compass, t.compassSub, const CompassScreen()),

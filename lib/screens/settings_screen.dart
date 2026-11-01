@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/app_state.dart';
@@ -9,6 +10,11 @@ import '../widgets/line_icons.dart';
 import '../widgets/sub_page.dart';
 import 'city_picker.dart';
 import 'onboarding_screen.dart';
+
+/// Contact shown in the settings, set at build time:
+/// --dart-define=CONTACT_WHATSAPP=2126XXXXXXXX or --dart-define=CONTACT_EMAIL=...
+const contactEmail = String.fromEnvironment('CONTACT_EMAIL');
+const contactWhatsApp = String.fromEnvironment('CONTACT_WHATSAPP');
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -97,6 +103,19 @@ class SettingsScreen extends StatelessWidget {
                   builder: (_) => const OnboardingScreen(replay: true))),
               child: Text(t.replayWelcome),
             ),
+            if (contactEmail.isNotEmpty || contactWhatsApp.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: () => launchUrl(
+                  contactWhatsApp.isNotEmpty
+                      ? Uri.parse('https://wa.me/$contactWhatsApp')
+                      : Uri(scheme: 'mailto', path: contactEmail, query: 'subject=Sayad'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: IconLabel(
+                    icon: const Icon(Icons.chat_outlined, size: 19), label: t.contactUs),
+              ),
+            ],
           ]),
         ),
       ]),

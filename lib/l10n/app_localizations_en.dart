@@ -791,4 +791,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get spotShareFailed => 'Could not send, try again later';
+
+  @override
+  String get bigTides => 'Biggest tides of the year';
+
+  @override
+  String get bigTidesSub => 'Best days for bait';
+
+  @override
+  String get bigTidesHelp =>
+      'Spring tides (1.5 days after new and full moon). The biggest are highlighted: the sea goes lowest, ideal for bait collecting and fishing the edges.';
+
+  @override
+  String get bigTideTop => 'among the biggest of the year';
+
+  @override
+  String get coefficientShort => 'coef.';
+
+  @override
+  String get coefficientDisclaimer =>
+      'Coefficient computed from the Moon and Sun positions (≈). The ranking of days is reliable; the value is approximate.';
+
+  @override
+  String get sky => 'Sun and moon in the sky';
+
+  @override
+  String get skySub => 'Direction and height all day';
+
+  @override
+  String get skyNow => 'Now';
+
+  @override
+  String get skyHelp =>
+      'The outer circle is the horizon, the centre is overhead. Yellow: sun path, grey: moon path.';
+
+  @override
+  String get skyHeight => 'Height';
+
+  @override
+  String get skyDirection => 'Direction';
+
+  @override
+  String get skyDistance => 'Distance';
+
+  @override
+  String get perigee => 'Moon close to Earth: stronger tides';
+
+  @override
+  String get proposeShop => 'Propose a shop here';
+
+  @override
+  String get shopName => 'Shop name';
+
+  @override
+  String get phone => 'Phone';
+
+  @override
+  String get city => 'Town';
+
+  @override
+  String get send => 'Send';
+
+  @override
+  String get contactUs => 'Contact us';
 }

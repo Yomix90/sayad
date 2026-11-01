@@ -798,4 +798,67 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get spotShareFailed => 'Envoi impossible, réessayez plus tard';
+
+  @override
+  String get bigTides => 'Grandes marées de l\'année';
+
+  @override
+  String get bigTidesSub => 'Meilleurs jours pour les appâts';
+
+  @override
+  String get bigTidesHelp =>
+      'Jours de vives-eaux (1,5 jour après la nouvelle et la pleine lune). Les plus fortes sont mises en avant : la mer y descend le plus bas, idéal pour ramasser les appâts et pêcher les bordures.';
+
+  @override
+  String get bigTideTop => 'parmi les plus fortes de l\'année';
+
+  @override
+  String get coefficientShort => 'coef.';
+
+  @override
+  String get coefficientDisclaimer =>
+      'Coefficient calculé à partir des positions de la Lune et du Soleil (≈). Le classement des jours est fiable ; la valeur est approximative.';
+
+  @override
+  String get sky => 'Soleil et lune dans le ciel';
+
+  @override
+  String get skySub => 'Direction et hauteur toute la journée';
+
+  @override
+  String get skyNow => 'Maintenant';
+
+  @override
+  String get skyHelp =>
+      'Le cercle extérieur est l\'horizon, le centre est au-dessus de vous. Jaune : trajet du soleil, gris : trajet de la lune.';
+
+  @override
+  String get skyHeight => 'Hauteur';
+
+  @override
+  String get skyDirection => 'Direction';
+
+  @override
+  String get skyDistance => 'Distance';
+
+  @override
+  String get perigee => 'Lune proche de la Terre : marées plus fortes';
+
+  @override
+  String get proposeShop => 'Proposer un magasin ici';
+
+  @override
+  String get shopName => 'Nom du magasin';
+
+  @override
+  String get phone => 'Téléphone';
+
+  @override
+  String get city => 'Ville';
+
+  @override
+  String get send => 'Envoyer';
+
+  @override
+  String get contactUs => 'Nous contacter';
 }

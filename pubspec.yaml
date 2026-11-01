@@ -48,6 +48,7 @@ dependencies:
   url_launcher: ^6.3.3
   hijri: ^3.0.1
   webview_flutter: ^4.14.1
+  home_widget: ^0.10.0
 
 dev_dependencies:
   flutter_test:

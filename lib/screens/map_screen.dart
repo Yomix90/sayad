@@ -339,6 +339,18 @@ class _MapScreenState extends State<MapScreen> {
                         label: t.guideOffline),
                   ),
                 ),
+                if (SpotsApi.enabled && spot == null)
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        _proposeShop(point);
+                      },
+                      icon: LineIcon('store', size: 18, color: p.accentInk),
+                      label: Text(t.proposeShop,
+                          style: TextStyle(color: p.accentInk, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
                 const SizedBox(height: 6),
                 Center(
                   child: TextButton.icon(
@@ -407,6 +419,42 @@ class _MapScreenState extends State<MapScreen> {
       // Offline or server down: keep what is shown.
     } finally {
       if (mounted) setState(() => _loadingCommunity = false);
+    }
+  }
+
+  Future<void> _proposeShop(LatLng point) async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final name = TextEditingController(), phone = TextEditingController(), city = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(t.proposeShop),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: name, autofocus: true, decoration: InputDecoration(labelText: t.shopName)),
+          const SizedBox(height: 10),
+          TextField(
+              controller: phone,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(labelText: t.phone)),
+          const SizedBox(height: 10),
+          TextField(controller: city, decoration: InputDecoration(labelText: t.city)),
+          const SizedBox(height: 8),
+          Text(t.shareSpotSub, style: const TextStyle(fontSize: 12.5)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(t.send)),
+        ],
+      ),
+    );
+    if (ok != true || name.text.trim().length < 2) return;
+    try {
+      await SpotsApi().submitShop(name.text.trim(), point,
+          phone: phone.text.trim(), city: city.text.trim());
+      messenger.showSnackBar(SnackBar(content: Text(t.spotShared)));
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(t.spotShareFailed)));
     }
   }
 

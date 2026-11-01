@@ -1563,6 +1563,126 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Envoi impossible, réessayez plus tard'**
   String get spotShareFailed;
+
+  /// No description provided for @bigTides.
+  ///
+  /// In fr, this message translates to:
+  /// **'Grandes marées de l\'année'**
+  String get bigTides;
+
+  /// No description provided for @bigTidesSub.
+  ///
+  /// In fr, this message translates to:
+  /// **'Meilleurs jours pour les appâts'**
+  String get bigTidesSub;
+
+  /// No description provided for @bigTidesHelp.
+  ///
+  /// In fr, this message translates to:
+  /// **'Jours de vives-eaux (1,5 jour après la nouvelle et la pleine lune). Les plus fortes sont mises en avant : la mer y descend le plus bas, idéal pour ramasser les appâts et pêcher les bordures.'**
+  String get bigTidesHelp;
+
+  /// No description provided for @bigTideTop.
+  ///
+  /// In fr, this message translates to:
+  /// **'parmi les plus fortes de l\'année'**
+  String get bigTideTop;
+
+  /// No description provided for @coefficientShort.
+  ///
+  /// In fr, this message translates to:
+  /// **'coef.'**
+  String get coefficientShort;
+
+  /// No description provided for @coefficientDisclaimer.
+  ///
+  /// In fr, this message translates to:
+  /// **'Coefficient calculé à partir des positions de la Lune et du Soleil (≈). Le classement des jours est fiable ; la valeur est approximative.'**
+  String get coefficientDisclaimer;
+
+  /// No description provided for @sky.
+  ///
+  /// In fr, this message translates to:
+  /// **'Soleil et lune dans le ciel'**
+  String get sky;
+
+  /// No description provided for @skySub.
+  ///
+  /// In fr, this message translates to:
+  /// **'Direction et hauteur toute la journée'**
+  String get skySub;
+
+  /// No description provided for @skyNow.
+  ///
+  /// In fr, this message translates to:
+  /// **'Maintenant'**
+  String get skyNow;
+
+  /// No description provided for @skyHelp.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le cercle extérieur est l\'horizon, le centre est au-dessus de vous. Jaune : trajet du soleil, gris : trajet de la lune.'**
+  String get skyHelp;
+
+  /// No description provided for @skyHeight.
+  ///
+  /// In fr, this message translates to:
+  /// **'Hauteur'**
+  String get skyHeight;
+
+  /// No description provided for @skyDirection.
+  ///
+  /// In fr, this message translates to:
+  /// **'Direction'**
+  String get skyDirection;
+
+  /// No description provided for @skyDistance.
+  ///
+  /// In fr, this message translates to:
+  /// **'Distance'**
+  String get skyDistance;
+
+  /// No description provided for @perigee.
+  ///
+  /// In fr, this message translates to:
+  /// **'Lune proche de la Terre : marées plus fortes'**
+  String get perigee;
+
+  /// No description provided for @proposeShop.
+  ///
+  /// In fr, this message translates to:
+  /// **'Proposer un magasin ici'**
+  String get proposeShop;
+
+  /// No description provided for @shopName.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nom du magasin'**
+  String get shopName;
+
+  /// No description provided for @phone.
+  ///
+  /// In fr, this message translates to:
+  /// **'Téléphone'**
+  String get phone;
+
+  /// No description provided for @city.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ville'**
+  String get city;
+
+  /// No description provided for @send.
+  ///
+  /// In fr, this message translates to:
+  /// **'Envoyer'**
+  String get send;
+
+  /// No description provided for @contactUs.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nous contacter'**
+  String get contactUs;
 }
 
 class _AppLocalizationsDelegate

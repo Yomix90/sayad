@@ -788,4 +788,67 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get spotShareFailed => 'تعذّر الإرسال، حاول لاحقاً';
+
+  @override
+  String get bigTides => 'أكبر المد والجزر في السنة';
+
+  @override
+  String get bigTidesSub => 'أفضل أيام جمع الطعوم';
+
+  @override
+  String get bigTidesHelp =>
+      'أيام الحمل (بعد المحاق والبدر بيوم ونصف). الأكبر مميَّزة: الجزر فيها أدنى، وهي الأفضل لجمع الطعوم والصيد عند الحواف.';
+
+  @override
+  String get bigTideTop => 'من الأكبر هذه السنة';
+
+  @override
+  String get coefficientShort => 'معامل';
+
+  @override
+  String get coefficientDisclaimer =>
+      'المعامل محسوب من مواقع القمر والشمس (≈). الترتيب بين الأيام موثوق، أما القيمة فتقريبية.';
+
+  @override
+  String get sky => 'الشمس والقمر في السماء';
+
+  @override
+  String get skySub => 'الاتجاه والارتفاع طوال اليوم';
+
+  @override
+  String get skyNow => 'الآن';
+
+  @override
+  String get skyHelp =>
+      'الدائرة الخارجية هي الأفق، والمركز فوق رأسك. الأصفر: مسار الشمس، الرمادي: مسار القمر.';
+
+  @override
+  String get skyHeight => 'الارتفاع';
+
+  @override
+  String get skyDirection => 'الاتجاه';
+
+  @override
+  String get skyDistance => 'المسافة';
+
+  @override
+  String get perigee => 'القمر قريب من الأرض: مد وجزر أقوى';
+
+  @override
+  String get proposeShop => 'اقتراح محل هنا';
+
+  @override
+  String get shopName => 'اسم المحل';
+
+  @override
+  String get phone => 'الهاتف';
+
+  @override
+  String get city => 'المدينة';
+
+  @override
+  String get send => 'إرسال';
+
+  @override
+  String get contactUs => 'تواصل معنا';
 }

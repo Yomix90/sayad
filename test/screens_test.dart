@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sayad/data/knots.dart';
 import 'package:sayad/data/species.dart';
 import 'package:sayad/main.dart';
+import 'package:sayad/screens/big_tides_screen.dart';
 import 'package:sayad/screens/catch_log_screen.dart';
 import 'package:sayad/screens/guides_screens.dart';
 import 'package:sayad/screens/onboarding_screen.dart';
 import 'package:sayad/screens/prayer_screen.dart';
 import 'package:sayad/screens/settings_screen.dart';
+import 'package:sayad/screens/sky_screen.dart';
 import 'package:sayad/screens/solunar_screen.dart';
 import 'package:sayad/theme.dart';
 
@@ -19,6 +21,8 @@ void main() {
     'onboarding': () => const OnboardingScreen(),
     'guide': () => const GuideScreen(),
     'tips': () => const TipsScreen(),
+    'bigTides': () => const BigTidesScreen(),
+    'sky': () => const SkyScreen(),
     'guideDetail': () => GuideDetailScreen(item: guide.first),
     'species': () => const SpeciesScreen(),
     'speciesDetail': () => SpeciesDetailScreen(species: species.first),
