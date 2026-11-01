@@ -113,6 +113,29 @@ def test_admin_edit_bulk_and_export():
     assert client.delete(f'/admin/api/spots/{sid}', headers=ADMIN).json()['deleted'] == sid
 
 
+def test_select_all_by_filter():
+    import sqlite3
+    with sqlite3.connect(server.DB_PATH) as c:
+        c.executemany('INSERT INTO spots(name, lat, lon, status, source, created_at) VALUES (?,?,?,?,?,0)', [
+            ('Maroc 1', 33.5, -7.6, 'approved', 'bulkcase'),
+            ('Maroc 2', 30.4, -9.6, 'approved', 'bulkcase'),
+            ('Indonésie', -6.6, 98.6, 'approved', 'bulkcase'),
+        ])
+    q = {'table': 'spots', 'source': 'bulkcase'}
+    assert client.get('/admin/api/items', headers=ADMIN, params={**q, 'area': 'outside'}).json()['total'] == 1
+    assert client.get('/admin/api/items', headers=ADMIN, params={**q, 'area': 'morocco'}).json()['total'] == 2
+    # Delete everything outside Morocco from that source, without ids.
+    r = client.post('/admin/api/spots/bulk-filter', headers=ADMIN,
+                    json={'action': 'delete', 'source': 'bulkcase', 'area': 'outside'})
+    assert r.json()['changed'] == 1
+    r = client.post('/admin/api/spots/bulk-filter', headers=ADMIN,
+                    json={'action': 'pending', 'source': 'bulkcase'})
+    assert r.json()['changed'] == 2
+    assert client.post('/admin/api/spots/bulk-filter', json={'action': 'delete'}).status_code == 401
+    # "Show all": large pages are allowed.
+    assert client.get('/admin/api/items', headers=ADMIN, params={'table': 'spots', 'limit': 20000}).status_code == 200
+
+
 if __name__ == '__main__':
     for name, fn in list(globals().items()):
         if name.startswith('test_'):

@@ -54,7 +54,7 @@
   .login { max-width: 380px; margin: 12vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px; }
   .login h2 { margin-top: 0; }
   .login input { width: 100%; margin: 10px 0 14px; }
-  dialog { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: min(520px, 94vw); }
+  dialog { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: min(620px, 96vw); }
   dialog label { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
   dialog input, dialog textarea, dialog select { width: 100%; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -97,12 +97,24 @@
           <option value="">Tous les statuts</option><option value="pending">En attente</option>
           <option value="approved">Validés</option><option value="rejected">Refusés</option>
         </select>
+        <select id="source"><option value="">Toutes les sources</option></select>
+        <select id="area">
+          <option value="">Partout</option><option value="morocco">Au Maroc</option><option value="outside">Hors du Maroc</option>
+        </select>
+        <select id="limit">
+          <option value="50">50 par page</option><option value="200">200 par page</option>
+          <option value="1000">1000 par page</option><option value="20000">Tout afficher</option>
+        </select>
         <input type="search" id="q" placeholder="Rechercher un nom, une info, un téléphone…">
         <span class="sp" style="flex:1"></span>
         <button class="ok" data-bulk="approve" disabled>Valider la sélection</button>
         <button data-bulk="reject" disabled>Refuser</button>
         <button class="danger" data-bulk="delete" disabled>Supprimer</button>
         <a class="btn" id="export">Exporter CSV</a>
+      </div>
+      <div id="selAll" class="card hidden" style="margin-bottom:10px;padding:10px 14px">
+        <span id="selAllText"></span>
+        <button id="selAllBtn" class="primary" style="margin-inline-start:8px"></button>
       </div>
       <table>
         <thead><tr><th><input type="checkbox" id="all"></th><th>#</th><th>Nom</th><th>Position</th><th>Infos</th><th>Source</th><th>Statut</th><th></th></tr></thead>
@@ -146,6 +158,8 @@
   <form method="dialog" id="editForm">
     <h3 id="editTitle">Modifier</h3>
     <label>Nom<input name="name" dir="auto" required></label>
+    <div id="editMap" style="height:220px;border-radius:12px;border:1px solid var(--border);margin-top:10px"></div>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">Faites glisser le point (ou touchez la carte) pour corriger la position.</p>
     <div class="grid2">
       <label>Latitude<input name="lat" type="number" step="any" required></label>
       <label>Longitude<input name="lon" type="number" step="any" required></label>
@@ -175,7 +189,7 @@
 <script>
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 let token = sessionStorage.getItem('sayadToken') || '';
-const state = { tab: 'pending', table: 'spots', status: 'pending', q: '', offset: 0, limit: 50, total: 0, items: [] };
+const state = { tab: 'pending', table: 'spots', status: 'pending', q: '', source: '', area: '', offset: 0, limit: 50, total: 0, items: [], allSelected: false };
 
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 async function api(path, opts = {}) {
@@ -200,12 +214,18 @@ async function loadStats() {
   $('#cards').innerHTML = card(s.spots.approved, 'Spots validés') + card(s.spots.pending, 'Spots en attente') +
     card(s.shops.approved, 'Magasins validés') + card(s.shops.pending, 'Magasins en attente') +
     card(s.spots.rejected + s.shops.rejected, 'Refusés');
+  const sources = Object.keys({ ...s.spots.sources, ...s.shops.sources }).sort();
+  const cur = $('#source').value;
+  $('#source').innerHTML = '<option value="">Toutes les sources</option>' +
+    sources.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('#source').value = sources.includes(cur) ? cur : '';
   const pend = s.spots.pending + s.shops.pending;
   $('[data-tab=pending]').textContent = pend ? `À valider (${pend})` : 'À valider';
 }
 
 async function loadList() {
-  const p = new URLSearchParams({ table: state.table, q: state.q, offset: state.offset, limit: state.limit });
+  const p = new URLSearchParams({ table: state.table, q: state.q, source: state.source, area: state.area,
+                                   offset: state.offset, limit: state.limit });
   if (state.status) p.set('status', state.status);
   const r = await api('/admin/api/items?' + p);
   state.total = r.total; state.items = r.items;
@@ -228,7 +248,7 @@ async function loadList() {
   const page = Math.floor(state.offset / state.limit) + 1, pages = Math.max(1, Math.ceil(state.total / state.limit));
   $('#page').textContent = `Page ${page} / ${pages} · ${state.total} éléments`;
   $('#prev').disabled = state.offset === 0; $('#next').disabled = state.offset + state.limit >= state.total;
-  $('#all').checked = false; updateBulk();
+  $('#all').checked = false; state.allSelected = false; updateBulk();
   $('#export').onclick = async () => {
     const res = await api(`/admin/api/export/${state.table}.csv`);
     const url = URL.createObjectURL(await res.blob());
@@ -236,14 +256,33 @@ async function loadList() {
   };
 }
 function selectedIds() { return $$('.sel:checked').map(c => +c.closest('tr').dataset.id); }
-function updateBulk() { const n = selectedIds().length; $$('[data-bulk]').forEach(b => b.disabled = !n); }
-
-async function bulk(action, ids) {
-  if (action === 'delete' && !confirm(`Supprimer ${ids.length} élément(s) définitivement ?`)) return;
-  const r = await api(`/admin/api/${state.table}/bulk`, { method: 'POST', body: JSON.stringify({ ids, action }) });
-  toast(`${r.changed} élément(s) modifié(s)`); refresh();
+function updateBulk() {
+  const n = state.allSelected ? state.total : selectedIds().length;
+  $$('[data-bulk]').forEach(b => b.disabled = !n);
+  const pageAll = $('#all').checked && state.total > state.items.length;
+  $('#selAll').classList.toggle('hidden', !pageAll && !state.allSelected);
+  if (state.allSelected) {
+    $('#selAllText').textContent = `Les ${state.total} éléments correspondant aux filtres sont sélectionnés.`;
+    $('#selAllBtn').textContent = 'Annuler la sélection';
+  } else if (pageAll) {
+    $('#selAllText').textContent = `Les ${state.items.length} éléments de cette page sont sélectionnés.`;
+    $('#selAllBtn').textContent = `Sélectionner les ${state.total} résultats`;
+  }
 }
 
+async function bulk(action, ids) {
+  const all = state.allSelected && ids === null;
+  const n = all ? state.total : ids.length;
+  if (action === 'delete' && !confirm(`Supprimer ${n} élément(s) définitivement ?`)) return;
+  if (all && action !== 'delete' && !confirm(`Appliquer à ${n} élément(s) ?`)) return;
+  const r = all
+    ? await api(`/admin/api/${state.table}/bulk-filter`, { method: 'POST', body: JSON.stringify({
+        action, status: state.status || null, q: state.q, source: state.source, area: state.area }) })
+    : await api(`/admin/api/${state.table}/bulk`, { method: 'POST', body: JSON.stringify({ ids, action }) });
+  toast(`${r.changed} élément(s) modifié(s)`); state.allSelected = false; refresh();
+}
+
+let editMap, editMarker;
 function openEdit(it) {
   const f = $('#editForm');
   $('#editTitle').textContent = `Modifier · ${state.table === 'spots' ? 'spot' : 'magasin'} #${it.id}`;
@@ -254,6 +293,21 @@ function openEdit(it) {
     if (el.type === 'checkbox') el.checked = !!it[el.name]; else el.value = it[el.name] ?? '';
   }
   $('#edit').showModal();
+  const ll = [+it.lat, +it.lon];
+  if (!editMap) {
+    editMap = L.map('editMap');
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(editMap);
+    editMarker = L.marker(ll, { draggable: true }).addTo(editMap);
+    const sync = p => { f.elements.lat.value = p.lat.toFixed(6); f.elements.lon.value = p.lng.toFixed(6); };
+    editMarker.on('dragend', () => sync(editMarker.getLatLng()));
+    editMap.on('click', e => { editMarker.setLatLng(e.latlng); sync(e.latlng); });
+    for (const n of ['lat', 'lon']) f.elements[n].addEventListener('change', () => {
+      const p = [+f.elements.lat.value, +f.elements.lon.value];
+      editMarker.setLatLng(p); editMap.panTo(p);
+    });
+  }
+  editMarker.setLatLng(ll);
+  setTimeout(() => { editMap.invalidateSize(); editMap.setView(ll, 13); }, 60);
   $('#edit').onclose = async () => {
     if ($('#edit').returnValue !== 'save') return;
     const body = {};
@@ -352,14 +406,22 @@ let qTimer; $('#q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout((
 $('#prev').onclick = () => { state.offset = Math.max(0, state.offset - state.limit); loadList(); };
 $('#next').onclick = () => { state.offset += state.limit; loadList(); };
 $('#all').onchange = e => { $$('.sel').forEach(c => c.checked = e.target.checked); updateBulk(); };
-$('#rows').onchange = e => e.target.classList.contains('sel') && updateBulk();
+$('#rows').onchange = e => { if (e.target.classList.contains('sel')) { state.allSelected = false; updateBulk(); } };
 $('#rows').onclick = async e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const id = +b.closest('tr').dataset.id, it = state.items.find(x => x.id === id);
   if (b.dataset.act === 'edit') return openEdit(it);
   await bulk(b.dataset.act, [id]);
 };
-$$('[data-bulk]').forEach(b => b.onclick = () => bulk(b.dataset.bulk, selectedIds()));
+$$('[data-bulk]').forEach(b => b.onclick = () => bulk(b.dataset.bulk, state.allSelected ? null : selectedIds()));
+$('#selAllBtn').onclick = () => {
+  state.allSelected = !state.allSelected;
+  if (!state.allSelected) { $('#all').checked = false; $$('.sel').forEach(c => c.checked = false); }
+  updateBulk();
+};
+$('#source').onchange = e => { state.source = e.target.value; state.offset = 0; loadList(); };
+$('#area').onchange = e => { state.area = e.target.value; state.offset = 0; loadList(); };
+$('#limit').onchange = e => { state.limit = +e.target.value; state.offset = 0; loadList(); };
 ['#mSpots', '#mShops', '#mPending'].forEach(s => $(s).onchange = loadMap);
 $('#rescan').onclick = loadFiles;
 $('#uploadBtn').onclick = async () => {

@@ -228,9 +228,12 @@ def stats():
     return out
 
 
-@app.get('/admin/api/items', dependencies=admin)
-def items(table: Table, status: Optional[Status] = None, q: str = '', source: str = '',
-          offset: int = 0, limit: int = Query(50, le=500)):
+# Rough box around Morocco (Algerian border to Dakhla), for the
+# "outside Morocco" filter.
+MOROCCO = (20.5, 36.2, -17.6, -0.9)
+
+
+def _filter(table: str, status: Optional[str], q: str, source: str, area: str):
     where, args = [], []
     if status:
         where.append('status = ?')
@@ -241,7 +244,21 @@ def items(table: Table, status: Optional[Status] = None, q: str = '', source: st
     if q:
         where.append('(name LIKE ? OR description LIKE ?' + (' OR phone LIKE ?' if table == 'shops' else '') + ')')
         args += [f'%{q}%'] * (3 if table == 'shops' else 2)
-    sql_where = ('WHERE ' + ' AND '.join(where)) if where else ''
+    inside = 'lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?'
+    if area == 'morocco':
+        where.append(inside)
+        args += list(MOROCCO)
+    elif area == 'outside':
+        where.append(f'NOT ({inside})')
+        args += list(MOROCCO)
+    return ('WHERE ' + ' AND '.join(where)) if where else '', args
+
+
+@app.get('/admin/api/items', dependencies=admin)
+def items(table: Table, status: Optional[Status] = None, q: str = '', source: str = '',
+          area: Literal['', 'morocco', 'outside'] = '',
+          offset: int = 0, limit: int = Query(50, le=20000)):
+    sql_where, args = _filter(table, status, q, source, area)
     with db() as c:
         total = c.execute(f'SELECT COUNT(*) FROM {table} {sql_where}', args).fetchone()[0]
         rows = c.execute(f'SELECT * FROM {table} {sql_where} ORDER BY id DESC LIMIT ? OFFSET ?',
@@ -290,6 +307,27 @@ def delete(table: Table, item_id: int):
     if cur.rowcount == 0:
         raise HTTPException(404, 'Not found')
     return {'deleted': item_id}
+
+
+class BulkFilter(BaseModel):
+    """Applies an action to every item matching the list filters."""
+    action: Literal['approve', 'reject', 'pending', 'delete']
+    status: Optional[Status] = None
+    q: str = ''
+    source: str = ''
+    area: Literal['', 'morocco', 'outside'] = ''
+
+
+@app.post('/admin/api/{table}/bulk-filter', dependencies=admin)
+def bulk_filter(table: Table, body: BulkFilter):
+    sql_where, args = _filter(table, body.status, body.q, body.source, body.area)
+    with db() as c:
+        if body.action == 'delete':
+            cur = c.execute(f'DELETE FROM {table} {sql_where}', args)
+        else:
+            status = {'approve': 'approved', 'reject': 'rejected', 'pending': 'pending'}[body.action]
+            cur = c.execute(f'UPDATE {table} SET status = ? {sql_where}', [status] + args)
+    return {'changed': cur.rowcount}
 
 
 class Bulk(BaseModel):
