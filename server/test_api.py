@@ -49,6 +49,9 @@ def test_validation_and_rate_limit():
 
 def test_admin_pending_requires_token():
     assert client.get('/admin/pending').status_code == 401
+    # Spaces or quotes around a pasted token are ignored.
+    assert client.get('/admin/api/stats', headers={'X-Admin-Token': ' "secret-test" '}).status_code == 200
+    assert client.get('/admin/api/stats', headers={'X-Admin-Token': 'Secret-test'}).status_code == 401
     assert 'spots' in client.get('/admin/pending', headers=ADMIN).json()
 
 

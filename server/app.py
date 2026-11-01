@@ -10,6 +10,7 @@ Environment:
   OLD_APP_DIR   folder scanned for files to import (default: ../old app)
 """
 import csv
+import hmac
 import io
 import os
 import sqlite3
@@ -28,7 +29,8 @@ import osm_import
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('SAYAD_DB', os.path.join(HERE, 'sayad.db'))
-ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '')
+# Tolerate quotes or spaces copied into the Dokploy environment.
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '').strip().strip('"\'').strip()
 OLD_APP_DIR = os.environ.get('OLD_APP_DIR', os.path.join(HERE, '..', 'old app'))
 
 SCHEMA = """
@@ -125,7 +127,8 @@ def limit_submissions(request: Request) -> None:
 
 
 def require_admin(x_admin_token: str = Header(default='')) -> None:
-    if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
+    given = x_admin_token.strip().strip('"\'').strip()
+    if not ADMIN_TOKEN or not hmac.compare_digest(given, ADMIN_TOKEN):
         raise HTTPException(401, 'Admin token required')
 
 

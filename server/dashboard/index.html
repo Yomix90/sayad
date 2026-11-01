@@ -69,7 +69,7 @@
 <section id="login" class="login">
   <h2>Sayad · Administration</h2>
   <p class="muted">Entrez le jeton administrateur (variable <code>ADMIN_TOKEN</code> du serveur).</p>
-  <input id="token" type="password" placeholder="Jeton administrateur" autocomplete="current-password">
+  <input id="token" type="password" placeholder="Jeton administrateur" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
   <button class="primary" id="loginBtn">Se connecter</button>
   <p id="loginErr" class="muted"></p>
 </section>
@@ -211,9 +211,11 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const statusLabel = { approved: 'Validé', pending: 'En attente', rejected: 'Refusé' };
 
 async function login() {
-  token = $('#token').value.trim() || token;
+  // Pasted tokens often carry spaces, line breaks or quotes.
+  const typed = $('#token').value.replace(/[\s"'«»“”]/g, '');
+  token = typed || token;
   try { await api('/admin/api/stats'); sessionStorage.setItem('sayadToken', token); $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); showTab(state.tab); }
-  catch (e) { $('#loginErr').textContent = 'Jeton refusé.'; }
+  catch (e) { $('#loginErr').textContent = `Jeton refusé (${token.length} caractères saisis, le jeton en compte en général 48). Vérifiez qu'il n'y a pas de majuscule ajoutée par le clavier.`; }
 }
 function logout() { sessionStorage.removeItem('sayadToken'); token = ''; $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); }
 
