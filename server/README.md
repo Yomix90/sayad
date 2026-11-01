@@ -27,7 +27,7 @@ Limite : 5 propositions par heure et par adresse IP.
 1. Dans Dokploy : **Create Service → Compose**.
 2. **Provider** : GitHub, dépôt `Yomix90/sayad`, branche `main`, **Compose Path** : `./docker-compose.yml` (valeur par défaut, fichier à la racine du dépôt).
 3. **Environment** : ajoutez `ADMIN_TOKEN=` suivi d'un long mot de passe aléatoire (par exemple généré avec `openssl rand -hex 24`).
-4. **Domains** : ajoutez votre domaine (par exemple `api.votresite.com`) sur le service `sayad-api`, **port 8100**, HTTPS activé (Let's Encrypt).
+4. **Domaine** : le fichier `docker-compose.yml` publie déjà l'API sur `sayad.digitlab.dev` en HTTPS (étiquettes Traefik). Pour un autre domaine, ajoutez `SAYAD_DOMAIN=api.votresite.com` dans **Environment**. Inutile d'ajouter le domaine dans l'onglet **Domains** (si vous l'avez fait, supprimez-le pour éviter deux routes).
 5. **Deploy**. Vérifiez `https://votre-domaine/health`, puis ouvrez `https://votre-domaine/admin`.
 
 La base de données et les fichiers à importer sont dans le volume Docker `sayad-data` (dossier `/data` du conteneur). Ils sont conservés entre deux déploiements.
