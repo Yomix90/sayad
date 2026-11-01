@@ -158,6 +158,22 @@ def test_osm_import():
     assert client.get('/admin/api/import/osm', headers=ADMIN).json()['done'] == 1
 
 
+def test_dashboard_javascript_is_valid():
+    """A syntax error in the page's script silently breaks the login button."""
+    import shutil
+    import subprocess
+    node = shutil.which('node')
+    if not node:
+        return  # Node.js not installed: nothing to check.
+    html = open(os.path.join(os.path.dirname(__file__), 'dashboard', 'index.html'), encoding='utf-8').read()
+    start = html.index('<script>', html.index('</dialog>')) + len('<script>')
+    script = html[start:html.rindex('</script>')]
+    path = os.path.join(TMP, 'dashboard.js')
+    open(path, 'w', encoding='utf-8').write(script)
+    r = subprocess.run([node, '--check', path], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+
+
 if __name__ == '__main__':
     for name, fn in list(globals().items()):
         if name.startswith('test_'):

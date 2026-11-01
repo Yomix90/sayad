@@ -449,7 +449,7 @@ function showOsm(st) {
   if (st.running) osmTimer = setTimeout(async () => { showOsm(await api('/admin/api/import/osm')); loadStats(); }, 4000);
 }
 $('#osmBtn').onclick = async () => {
-  if (!confirm('Lancer l'import OpenStreetMap de toute la côte (environ 10 minutes) ?')) return;
+  if (!confirm("Lancer l'import OpenStreetMap de toute la côte (environ 20 minutes) ?")) return;
   try { showOsm(await api('/admin/api/import/osm', { method: 'POST', body: JSON.stringify({ status: $('#osmStatus').value }) })); }
   catch (e) { toast('Erreur : ' + e.message); }
 };
