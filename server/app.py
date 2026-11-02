@@ -13,6 +13,7 @@ import csv
 import hmac
 import io
 import os
+import re
 import sqlite3
 import time
 from collections import defaultdict, deque
@@ -64,6 +65,14 @@ CREATE TABLE IF NOT EXISTS shops (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shops_pos ON shops(status, lat, lon);
+CREATE TABLE IF NOT EXISTS import_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file TEXT NOT NULL,
+  tbl TEXT NOT NULL DEFAULT '',
+  target TEXT NOT NULL,
+  inserted INTEGER NOT NULL,
+  at INTEGER NOT NULL
+);
 """
 
 # Columns added after the first version: added to existing databases.
@@ -315,6 +324,48 @@ def delete(table: Table, item_id: int):
     return {'deleted': item_id}
 
 
+class Convert(BaseModel):
+    """Moves items to the other table (spot <-> shop). Either [ids], or every
+    item matching the list filters when [all_matching] is true."""
+    ids: List[int] = []
+    all_matching: bool = False
+    status: Optional[Status] = None
+    q: str = ''
+    source: str = ''
+    area: Literal['', 'morocco', 'outside'] = ''
+
+
+@app.post('/admin/api/{table}/convert', dependencies=admin)
+def convert(table: Table, body: Convert):
+    target = 'shops' if table == 'spots' else 'spots'
+    if body.all_matching:
+        sql_where, args = _filter(table, body.status, body.q, body.source, body.area)
+    elif body.ids:
+        sql_where = f'WHERE id IN ({",".join("?" * len(body.ids))})'
+        args = list(body.ids)
+    else:
+        return {'converted': 0, 'into': target}
+    with db() as c:
+        rows = c.execute(f'SELECT * FROM {table} {sql_where}', args).fetchall()
+        for r in rows:
+            r = dict(r)
+            if target == 'shops':
+                m = importer.PHONE_RE.search(r.get('description') or '')
+                phone = re.sub(r'[\s.-]', '', m.group(0)) if m else ''
+                c.execute('INSERT INTO shops(name, lat, lon, phone, description, icon, status, source, created_at) '
+                          'VALUES (?,?,?,?,?,?,?,?,?)',
+                          (r['name'], r['lat'], r['lon'], phone, r.get('description') or '',
+                           r.get('icon') or '', r['status'], r['source'], r['created_at']))
+            else:
+                desc = ' · '.join(x for x in (r.get('phone'), r.get('city'), r.get('description')) if x)
+                c.execute('INSERT INTO spots(name, lat, lon, kind, description, icon, status, source, created_at) '
+                          "VALUES (?,?,?, 'other', ?,?,?,?,?)",
+                          (r['name'], r['lat'], r['lon'], desc[:500], r.get('icon') or '',
+                           r['status'], r['source'], r['created_at']))
+            c.execute(f'DELETE FROM {table} WHERE id = ?', (r['id'],))
+    return {'converted': len(rows), 'into': target}
+
+
 class BulkFilter(BaseModel):
     """Applies an action to every item matching the list filters."""
     action: Literal['approve', 'reject', 'pending', 'delete']
@@ -377,9 +428,21 @@ def _safe_path(rel: str) -> str:
     return path
 
 
+def _imports_by_file():
+    with db() as c:
+        rows = c.execute('SELECT file, tbl, MAX(at) AS at, SUM(inserted) AS inserted '
+                         'FROM import_log GROUP BY file, tbl').fetchall()
+    return {(r['file'], r['tbl']): dict(r) for r in rows}
+
+
 @app.get('/admin/api/import/files', dependencies=admin)
 def import_files():
-    return {'dir': os.path.realpath(OLD_APP_DIR), 'files': importer.scan(OLD_APP_DIR)}
+    log = _imports_by_file()
+    files = importer.scan(OLD_APP_DIR)
+    for f in files:
+        f['uploaded'] = f['file'].startswith('uploads/')
+        f['imported'] = log.get((f['file'], f['table'] or ''))
+    return {'dir': os.path.realpath(OLD_APP_DIR), 'files': files}
 
 
 class ImportReq(BaseModel):
@@ -394,8 +457,13 @@ class ImportReq(BaseModel):
 @app.post('/admin/api/import', dependencies=admin)
 def run_import(req: ImportReq):
     path = _safe_path(req.file)
-    return importer.import_file(DB_PATH, path, table=req.table, into=req.into,
-                                status=req.status, source=req.source, dry_run=req.dry_run)
+    result = importer.import_file(DB_PATH, path, table=req.table, into=req.into,
+                                  status=req.status, source=req.source, dry_run=req.dry_run)
+    if not req.dry_run and 'error' not in result:
+        with db() as c:
+            c.execute('INSERT INTO import_log(file, tbl, target, inserted, at) VALUES (?,?,?,?,?)',
+                      (req.file, req.table or '', result['into'], result['inserted'], int(time.time())))
+    return result
 
 
 @app.post('/admin/api/import/upload', dependencies=admin)
@@ -411,6 +479,39 @@ async def upload(file: UploadFile = File(...)):
     with open(os.path.join(folder, name), 'wb') as f:
         f.write(data)
     return {'saved': f'uploads/{name}'}
+
+
+def _uploaded_files():
+    folder = os.path.join(OLD_APP_DIR, 'uploads')
+    if not os.path.isdir(folder):
+        return []
+    return [f'uploads/{n}' for n in sorted(os.listdir(folder))
+            if os.path.isfile(os.path.join(folder, n))]
+
+
+class FileReq(BaseModel):
+    file: str
+
+
+@app.post('/admin/api/import/delete', dependencies=admin)
+def delete_upload(req: FileReq):
+    """Deletes one file sent from the dashboard (only in uploads/)."""
+    if not req.file.startswith('uploads/'):
+        raise HTTPException(400, 'Only uploaded files can be deleted')
+    os.remove(_safe_path(req.file))
+    return {'deleted': [req.file]}
+
+
+@app.post('/admin/api/import/cleanup', dependencies=admin)
+def cleanup_uploads():
+    """Deletes uploaded files that were never imported."""
+    used = {f for f, _ in _imports_by_file()}
+    deleted = []
+    for rel in _uploaded_files():
+        if rel not in used:
+            os.remove(_safe_path(rel))
+            deleted.append(rel)
+    return {'deleted': deleted}
 
 
 # --- Import from OpenStreetMap -------------------------------------------------

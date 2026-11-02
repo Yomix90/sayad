@@ -109,6 +109,7 @@
         <span class="sp" style="flex:1"></span>
         <button class="ok" data-bulk="approve" disabled>Valider la sélection</button>
         <button data-bulk="reject" disabled>Refuser</button>
+        <button data-bulk="convert" id="convertBtn" disabled>Changer en magasin</button>
         <button class="danger" data-bulk="delete" disabled>Supprimer</button>
         <a class="btn" id="export">Exporter CSV</a>
       </div>
@@ -151,10 +152,11 @@
           <input type="file" id="upload" accept=".db,.sqlite,.sqlite3,.csv,.json,.geojson">
           <button id="uploadBtn">Envoyer un fichier</button>
           <button id="rescan">Actualiser</button>
+          <button class="danger" id="cleanup">Supprimer les fichiers envoyés jamais importés</button>
         </div>
       </div>
       <table>
-        <thead><tr><th>Fichier</th><th>Table</th><th>Lignes</th><th>Colonnes</th><th>Importer dans</th><th>Statut</th><th></th></tr></thead>
+        <thead><tr><th>Fichier</th><th>Table</th><th>Lignes</th><th>Colonnes</th><th>Déjà importé</th><th>Importer dans</th><th>Statut</th><th></th></tr></thead>
         <tbody id="files"></tbody>
       </table>
       <h3>Résultat</h3>
@@ -253,6 +255,7 @@ async function loadList() {
         ${it.status !== 'approved' ? '<button class="ok" data-act="approve">✓</button>' : ''}
         ${it.status !== 'rejected' ? '<button data-act="reject">✕</button>' : ''}
         <button data-act="edit">Modifier</button>
+        <button data-act="convert" title="Changer le type">${state.table === 'spots' ? '→ Magasin' : '→ Spot'}</button>
         <button class="danger" data-act="delete">🗑</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="8" class="muted">Aucun élément.</td></tr>';
@@ -284,6 +287,15 @@ function updateBulk() {
 async function bulk(action, ids) {
   const all = state.allSelected && ids === null;
   const n = all ? state.total : ids.length;
+  if (action === 'convert') {
+    const to = state.table === 'spots' ? 'magasin(s)' : 'spot(s)';
+    if (!confirm(`Changer ${n} élément(s) en ${to} ?`)) return;
+    const r = await api(`/admin/api/${state.table}/convert`, { method: 'POST', body: JSON.stringify(all
+      ? { all_matching: true, status: state.status || null, q: state.q, source: state.source, area: state.area }
+      : { ids }) });
+    toast(`${r.converted} élément(s) changé(s) en ${to}`); state.allSelected = false; refresh();
+    return;
+  }
   if (action === 'delete' && !confirm(`Supprimer ${n} élément(s) définitivement ?`)) return;
   if (all && action !== 'delete' && !confirm(`Appliquer à ${n} élément(s) ?`)) return;
   const r = all
@@ -368,13 +380,22 @@ async function loadFiles() {
       <td>${esc(f.table || '—')}</td>
       <td class="n">${f.rows}</td>
       <td class="muted" style="font-size:12px">${esc(f.columns.join(', '))}</td>
+      <td>${f.imported
+        ? `<span class="pill approved">${new Date(f.imported.at * 1000).toLocaleDateString('fr-FR')} · ${f.imported.inserted}</span>`
+        : '<span class="pill pending">Jamais</span>'}</td>
       <td><select class="into"><option value="spots" ${f.target === 'spots' ? 'selected' : ''}>Spots</option><option value="shops" ${f.target === 'shops' ? 'selected' : ''}>Magasins</option></select></td>
       <td><select class="st"><option value="approved">Validés</option><option value="pending">En attente</option></select></td>
-      <td class="actions"><button data-imp="dry">Aperçu</button> <button class="primary" data-imp="run">Importer</button></td>
-    </tr>`).join('') || '<tr><td colspan="7" class="muted">Aucun fichier importable dans ce dossier.</td></tr>';
+      <td class="actions"><button data-imp="dry">Aperçu</button> <button class="primary" data-imp="run">Importer</button>${f.uploaded ? ' <button class="danger" data-imp="del" title="Supprimer ce fichier">🗑</button>' : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="muted">Aucun fichier importable dans ce dossier.</td></tr>';
   $('#files').onclick = async e => {
     const b = e.target.closest('[data-imp]'); if (!b) return;
     const tr = b.closest('tr'), f = r.files[+tr.dataset.i];
+    if (b.dataset.imp === 'del') {
+      if (!confirm(`Supprimer le fichier ${f.file} du serveur ? Les spots déjà importés restent.`)) return;
+      try { await api('/admin/api/import/delete', { method: 'POST', body: JSON.stringify({ file: f.file }) }); toast('Fichier supprimé'); loadFiles(); }
+      catch (err) { toast('Erreur : ' + err.message); }
+      return;
+    }
     const dry = b.dataset.imp === 'dry';
     if (!dry && !confirm(`Importer ${f.rows} lignes de ${f.file}${f.table ? ' (' + f.table + ')' : ''} ?`)) return;
     b.disabled = true;
@@ -396,6 +417,7 @@ function showTab(tab) {
   if (tab === 'pending') { state.status = 'pending'; }
   if (tab === 'spots' || tab === 'shops') { state.table = tab; state.status = ''; }
   $('#table').value = state.table; $('#status').value = state.status; state.offset = 0;
+  $('#convertBtn').textContent = state.table === 'spots' ? 'Changer en magasin' : 'Changer en spot';
   refresh();
 }
 async function refresh() {
@@ -412,7 +434,11 @@ $('#loginBtn').onclick = login;
 $('#token').onkeydown = e => e.key === 'Enter' && login();
 $('#logout').onclick = logout;
 $('#tabs').onclick = e => e.target.dataset.tab && showTab(e.target.dataset.tab);
-$('#table').onchange = e => { state.table = e.target.value; state.offset = 0; loadList(); };
+$('#table').onchange = e => {
+  state.table = e.target.value; state.offset = 0;
+  $('#convertBtn').textContent = state.table === 'spots' ? 'Changer en magasin' : 'Changer en spot';
+  loadList();
+};
 $('#status').onchange = e => { state.status = e.target.value; state.offset = 0; loadList(); };
 let qTimer; $('#q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.q = e.target.value; state.offset = 0; loadList(); }, 300); };
 $('#prev').onclick = () => { state.offset = Math.max(0, state.offset - state.limit); loadList(); };
@@ -436,6 +462,14 @@ $('#area').onchange = e => { state.area = e.target.value; state.offset = 0; load
 $('#limit').onchange = e => { state.limit = +e.target.value; state.offset = 0; loadList(); };
 ['#mSpots', '#mShops', '#mPending'].forEach(s => $(s).onchange = loadMap);
 $('#rescan').onclick = loadFiles;
+$('#cleanup').onclick = async () => {
+  if (!confirm("Supprimer du serveur tous les fichiers envoyés qui n'ont jamais été importés ?")) return;
+  try {
+    const r = await api('/admin/api/import/cleanup', { method: 'POST' });
+    toast(r.deleted.length ? `${r.deleted.length} fichier(s) supprimé(s)` : 'Aucun fichier inutilisé');
+    loadFiles();
+  } catch (e) { toast('Erreur : ' + e.message); }
+};
 let osmTimer;
 function showOsm(st) {
   const kinds = Object.entries(st.by_kind || {}).map(([k, v]) => `${k} ${v}`).join(', ');

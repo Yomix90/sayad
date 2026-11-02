@@ -158,6 +158,51 @@ def test_osm_import():
     assert client.get('/admin/api/import/osm', headers=ADMIN).json()['done'] == 1
 
 
+def test_convert_spots_and_shops():
+    import sqlite3
+    with sqlite3.connect(server.DB_PATH) as c:
+        c.execute("INSERT INTO spots(name, lat, lon, description, status, source, created_at) "
+                  "VALUES ('Magasin mal rangé', 33.6, -7.6, 'Tel 0661 23 45 67', 'approved', 'convcase', 0)")
+        c.execute("INSERT INTO spots(name, lat, lon, status, source, created_at) "
+                  "VALUES ('Vrai spot', 33.7, -7.4, 'approved', 'convcase', 0)")
+    items = client.get('/admin/api/items', headers=ADMIN, params={'table': 'spots', 'source': 'convcase'}).json()
+    wrong = next(i for i in items['items'] if i['name'] == 'Magasin mal rangé')
+    r = client.post('/admin/api/spots/convert', headers=ADMIN, json={'ids': [wrong['id']]}).json()
+    assert r == {'converted': 1, 'into': 'shops'}
+    shop = client.get('/admin/api/items', headers=ADMIN,
+                      params={'table': 'shops', 'q': 'Magasin mal rangé'}).json()['items'][0]
+    assert shop['phone'] == '0661234567' and shop['status'] == 'approved'
+    # And back, using the filter instead of ids.
+    r = client.post('/admin/api/shops/convert', headers=ADMIN,
+                    json={'all_matching': True, 'source': 'convcase'}).json()
+    assert r['converted'] == 1
+    left = client.get('/admin/api/items', headers=ADMIN, params={'table': 'spots', 'source': 'convcase'}).json()
+    assert left['total'] == 2
+    assert client.post('/admin/api/spots/convert', json={'ids': [1]}).status_code == 401
+
+
+def test_import_log_and_upload_cleanup():
+    up = os.path.join(server.OLD_APP_DIR, 'uploads')
+    os.makedirs(up, exist_ok=True)
+    for name in ('used.csv', 'unused.csv'):
+        with open(os.path.join(up, name), 'w', encoding='utf-8') as f:
+            f.write('name,lat,lon' + chr(10) + 'Spot csv,33.1,-8.6' + chr(10))
+    client.post('/admin/api/import', headers=ADMIN, json={'file': 'uploads/used.csv', 'into': 'spots'})
+    files = {f['file']: f for f in client.get('/admin/api/import/files', headers=ADMIN).json()['files']}
+    assert files['uploads/used.csv']['imported']['inserted'] == 1
+    assert files['uploads/unused.csv']['imported'] is None and files['uploads/unused.csv']['uploaded']
+    assert files['ast.db']['uploaded'] is False
+    r = client.post('/admin/api/import/cleanup', headers=ADMIN).json()
+    assert r['deleted'] == ['uploads/unused.csv']
+    assert os.path.exists(os.path.join(up, 'used.csv'))
+    # Only uploaded files can be deleted, one by one.
+    assert client.post('/admin/api/import/delete', headers=ADMIN, json={'file': 'ast.db'}).status_code == 400
+    assert client.post('/admin/api/import/delete', headers=ADMIN,
+                       json={'file': 'uploads/../../x'}).status_code == 400
+    assert client.post('/admin/api/import/delete', headers=ADMIN,
+                       json={'file': 'uploads/used.csv'}).json() == {'deleted': ['uploads/used.csv']}
+
+
 def test_dashboard_javascript_is_valid():
     """A syntax error in the page's script silently breaks the login button."""
     import shutil
