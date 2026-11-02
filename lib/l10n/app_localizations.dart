@@ -2091,6 +2091,18 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'L\'IA n\'est pas disponible pour le moment.'**
   String get aiUnavailable;
+
+  /// No description provided for @aiAnswer.
+  ///
+  /// In fr, this message translates to:
+  /// **'Réponse IA'**
+  String get aiAnswer;
+
+  /// No description provided for @aiAnswerNote.
+  ///
+  /// In fr, this message translates to:
+  /// **'Réponse automatique de l\'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter.'**
+  String get aiAnswerNote;
 }
 
 class _AppLocalizationsDelegate

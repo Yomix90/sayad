@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS comments (
   user_id INTEGER,
   author_name TEXT NOT NULL,
   body TEXT NOT NULL,
+  ai INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS comments_article ON comments(article_id, created_at);
@@ -82,6 +83,16 @@ def migrate(c) -> None:
         c.execute("ALTER TABLE articles ADD COLUMN kind TEXT NOT NULL DEFAULT 'article'")
         # The old forum's Q&A section holds questions.
         c.execute("UPDATE articles SET kind = 'question' WHERE category = 'qa'")
+    if 'ai' not in {r[1] for r in c.execute('PRAGMA table_info(comments)')}:
+        c.execute('ALTER TABLE comments ADD COLUMN ai INTEGER NOT NULL DEFAULT 0')
+
+
+AI_AUTHOR = 'Assistant Sayad'
+
+
+def ai_answers_on() -> bool:
+    """Automatic AI answers to new questions (AI_ANSWERS=0 turns them off)."""
+    return ai.enabled() and os.environ.get('AI_ANSWERS', '1').strip() != '0'
 
 
 CATEGORIES = ['general', 'surfcasting', 'spinning', 'pole', 'boat', 'qa', 'catches', 'videos']
@@ -348,8 +359,8 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         com, rea = counts(c, [article_id])
         out = summary(r, com, rea)
         out['body'] = r['body']
-        out['comment_list'] = [dict(x) for x in c.execute(
-            'SELECT id, user_id, author_name AS author, body, created_at FROM comments '
+        out['comment_list'] = [{**dict(x), 'ai': bool(x['ai'])} for x in c.execute(
+            'SELECT id, user_id, author_name AS author, body, ai, created_at FROM comments '
             'WHERE article_id = ? ORDER BY created_at, id', (article_id,))]
         mine = None
         if user:
@@ -381,7 +392,12 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
                             'source, created_at) VALUES (?,?,?,?,?,?,?, "app", ?)',
                             (user['id'], user['display_name'], a.title.strip(), a.body.strip(),
                              a.category, a.kind, json.dumps(images), int(time.time())))
-            return load_article(c, cur.lastrowid, user)
+            article_id = cur.lastrowid
+        if a.kind == 'question' and ai_answers_on():
+            # The answer arrives a few seconds later as the first comment.
+            threading.Thread(target=answer_question, args=(article_id,), daemon=True).start()
+        with db() as c:
+            return load_article(c, article_id, user)
 
     @router.delete('/forum/articles/{article_id}')
     def delete_own_article(article_id: int, user: dict = Depends(need_user)):
@@ -445,6 +461,24 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         """Suggests a clearer version of the text being written (not saved)."""
         ai_limit.hit(user['id'])
         return ai.improve(body.title, body.body, body.kind)
+
+    def answer_question(article_id: int) -> Optional[dict]:
+        """Posts the AI's answer as a comment; None when the AI fails."""
+        with db() as c:
+            r = c.execute('SELECT title, body FROM articles WHERE id = ?', (article_id,)).fetchone()
+        if r is None:
+            return None
+        try:
+            text = ai.answer(r['title'], r['body'])
+        except HTTPException as e:
+            print(f'AI answer to article {article_id} failed: {e.detail}')
+            return None
+        with db() as c:
+            cur = c.execute('INSERT INTO comments(article_id, user_id, author_name, body, ai, created_at) '
+                            'VALUES (?, NULL, ?, ?, 1, ?)', (article_id, AI_AUTHOR, text, int(time.time())))
+        return {'id': cur.lastrowid, 'author': AI_AUTHOR, 'body': text, 'ai': True}
+
+    router.answer_question = answer_question
 
     # --- Images ---------------------------------------------------------------
     def save_image(data: bytes) -> str:
@@ -513,7 +547,7 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
                 'users': c.execute('SELECT COUNT(*) FROM users').fetchone()[0],
             }
         return {'total': total, 'items': items, 'stats': stats, 'images': image_job.copy(),
-                'ai': ai.enabled()}
+                'ai': ai.enabled(), 'ai_answers': ai_answers_on()}
 
     class ArticleEdit(BaseModel):
         status: Optional[Literal['published', 'hidden']] = None
@@ -584,8 +618,21 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
     def admin_comments(article_id: int):
         with db() as c:
             return [dict(r) for r in c.execute(
-                'SELECT id, user_id, author_name AS author, body, created_at FROM comments '
+                'SELECT id, user_id, author_name AS author, body, ai, created_at FROM comments '
                 'WHERE article_id = ? ORDER BY created_at, id', (article_id,))]
+
+    @router.post('/admin/api/forum/articles/{article_id}/ai-answer', dependencies=admin)
+    def admin_ai_answer(article_id: int):
+        """Asks the AI to answer a question now (e.g. the old forum's ones)."""
+        with db() as c:
+            r = c.execute('SELECT title, body FROM articles WHERE id = ?', (article_id,)).fetchone()
+        if r is None:
+            raise HTTPException(404, 'Not found')
+        text = ai.answer(r['title'], r['body'])
+        with db() as c:
+            cur = c.execute('INSERT INTO comments(article_id, user_id, author_name, body, ai, created_at) '
+                            'VALUES (?, NULL, ?, ?, 1, ?)', (article_id, AI_AUTHOR, text, int(time.time())))
+        return {'id': cur.lastrowid, 'author': AI_AUTHOR, 'body': text, 'ai': True}
 
     @router.delete('/admin/api/forum/comments/{comment_id}', dependencies=admin)
     def admin_delete_comment(comment_id: int):

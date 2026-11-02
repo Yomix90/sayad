@@ -18,6 +18,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # 1 = the AI answers every new question in a comment, 0 = off.
+      AI_ANSWERS: ${AI_ANSWERS:-1}
     volumes:
       - sayad-data:/data
     expose:

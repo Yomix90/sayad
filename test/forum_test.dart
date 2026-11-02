@@ -37,7 +37,8 @@ void main() {
     expect(calls.single.headers['Authorization'], 'Bearer tok');
 
     final a = await api.article(2);
-    expect(a.comments.map((c) => c.author), ['Alice', 'Bob']);
+    expect(a.comments.map((c) => c.author), ['Alice', 'Bob', 'Assistant Sayad']);
+    expect(a.comments.last.ai, isTrue);
     expect(a.myReaction, 'like');
     final (counts, mine) = await api.react(2, 'fish');
     expect(counts['fish'], 2);
@@ -97,6 +98,7 @@ void main() {
         await tester.drag(find.text('Belle courbine à Dakhla 2'), const Offset(0, -500));
         await tester.pump(const Duration(milliseconds: 300));
         expect(bravo, findsOneWidget);
+        expect(find.textContaining(String.fromCharCode(0x1F916)), findsWidgets); // AI answer badge
 
         await state.setForumSession(
             'tok', ForumUser(id: 7, username: 'alice', displayName: 'Alice'));

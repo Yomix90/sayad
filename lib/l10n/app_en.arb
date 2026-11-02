@@ -331,5 +331,7 @@
   "aiImprove": "Improve with AI",
   "aiImproved": "Text improved by AI. Read it before publishing.",
   "aiUndo": "Back to my text",
-  "aiUnavailable": "AI is not available right now."
+  "aiUnavailable": "AI is not available right now.",
+  "aiAnswer": "AI answer",
+  "aiAnswerNote": "Automatic answer from the Sayad assistant: check it; anglers on the forum can add to it."
 }

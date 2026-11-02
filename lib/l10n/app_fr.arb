@@ -421,5 +421,7 @@
   "aiImprove": "Améliorer avec l'IA",
   "aiImproved": "Texte amélioré par l'IA. Relisez-le avant de publier.",
   "aiUndo": "Revenir à mon texte",
-  "aiUnavailable": "L'IA n'est pas disponible pour le moment."
+  "aiUnavailable": "L'IA n'est pas disponible pour le moment.",
+  "aiAnswer": "Réponse IA",
+  "aiAnswerNote": "Réponse automatique de l'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter."
 }

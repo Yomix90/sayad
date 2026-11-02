@@ -170,6 +170,7 @@
       <div class="cards" id="forumCards"></div>
       <div class="card" style="margin-bottom:12px">
         <b>Anciens articles</b>
+        <p class="muted" id="aiAnswersNote"></p>
         <p class="muted">Les fichiers d'articles de l'ancienne application (par ex. <code>encyclopedie_tifnit.json</code>) sont importés automatiquement dès qu'ils sont envoyés dans l'onglet Import. Les images sont ensuite copiées sur ce serveur.</p>
         <div class="bar" id="forumFiles"></div>
         <span id="forumImages" class="muted"></span>
@@ -599,6 +600,9 @@ async function loadForum() {
   const r = await api('/admin/api/forum/articles?' + p);
   forum.items = r.items;
   forum.ai = r.ai;
+  $('#aiAnswersNote').textContent = r.ai_answers
+    ? "Réponses automatiques : l'IA répond à chaque nouvelle question en commentaire (« Assistant Sayad »). Désactivables avec AI_ANSWERS=0."
+    : "Réponses automatiques de l'IA désactivées (ajoutez GEMINI_API_KEY pour les activer).";
   const card = (v, l) => `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`;
   $('#forumCards').innerHTML = card(r.stats.articles, 'Articles') + card(r.stats.questions, 'Questions') + card(r.stats.comments, 'Commentaires') + card(r.stats.users, 'Utilisateurs');
   $('#fPage').textContent = r.total ? `${forum.offset + 1}–${Math.min(forum.offset + forum.limit, r.total)} sur ${r.total}` : 'Aucun article';
@@ -614,6 +618,7 @@ async function loadForum() {
       <td class="actions">
         <button data-fact="edit" title="Modifier">✏️</button>
         <button data-fact="ai" title="${forum.ai ? 'Réécrire avec l\'IA' : 'IA non configurée : GEMINI_API_KEY ou ANTHROPIC_API_KEY'}" ${forum.ai ? '' : 'disabled'}>✨ IA</button>
+        ${a.kind === 'question' && forum.ai ? '<button data-fact="answer" title="Publier une réponse de l’IA en commentaire">🤖 Répondre</button>' : ''}
         <button data-fact="kind">${a.kind === 'question' ? '→ Article' : '→ Question'}</button>
         <button data-fact="comments">💬</button>
         <button data-fact="toggle">${a.status === 'published' ? 'Masquer' : 'Publier'}</button>
@@ -649,6 +654,12 @@ $('#fRows').onclick = async e => {
       finally { b.disabled = false; b.textContent = '✨ IA'; }
       return;
     }
+    if (b.dataset.fact === 'answer') {
+      b.disabled = true; b.textContent = '…';
+      try { await api(`/admin/api/forum/articles/${id}/ai-answer`, { method: 'POST' }); toast("Réponse de l'IA publiée"); loadForum(); }
+      finally { b.disabled = false; b.textContent = '🤖 Répondre'; }
+      return;
+    }
     if (b.dataset.fact === 'kind') {
       await api(`/admin/api/forum/articles/${id}`, { method: 'PUT', body: JSON.stringify({ kind: a.kind === 'question' ? 'article' : 'question' }) });
       return loadForum();
@@ -666,7 +677,7 @@ async function openComments(a) {
   $('#cTitle').textContent = a.title;
   const list = await api(`/admin/api/forum/articles/${a.id}/comments`);
   $('#cList').innerHTML = list.map(c => `<div class="card" style="margin:8px 0;padding:10px 12px" data-id="${c.id}">
-      <b dir="auto">${esc(c.author)}</b> <span class="muted">${day(c.created_at)}</span>
+      <b dir="auto">${esc(c.author)}</b> ${c.ai ? '<span class="pill gold">IA</span>' : ''} <span class="muted">${day(c.created_at)}</span>
       <button class="danger" data-cdel style="float:inline-end;padding:3px 8px">🗑</button>
       <div dir="auto" style="white-space:pre-wrap;margin-top:4px">${esc(c.body)}</div></div>`).join('') || '<p class="muted">Aucun commentaire.</p>';
   $('#cList').onclick = async e => {

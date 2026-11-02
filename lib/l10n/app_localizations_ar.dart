@@ -1059,4 +1059,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get aiUnavailable => 'الذكاء الاصطناعي غير متاح حاليًا.';
+
+  @override
+  String get aiAnswer => 'جواب آلي';
+
+  @override
+  String get aiAnswerNote =>
+      'جواب تلقائي من مساعد الصياد: تحقق منه، ويمكن لصيادي المنتدى إضافة آرائهم.';
 }

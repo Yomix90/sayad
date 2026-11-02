@@ -50,9 +50,29 @@ Format : texte brut uniquement, sans Markdown (pas de #, **, _ ni tableaux), car
 Si le texte est vide de sens, injurieux ou n'a rien à voir avec la pêche ou la mer, corrige seulement l'orthographe sans rien ajouter."""
 
 
+ANSWER_SYSTEM = """Tu es l'Assistant Sayad, un guide de pêche expérimenté qui connaît bien les côtes du Maroc (Méditerranée, Atlantique, Souss, Sahara), la pêche du bord, le surfcasting, le spinning, la pêche à la palangrotte et en bateau. Un membre du forum de l'application Sayad vient de poser une question. Ta réponse est publiée comme premier commentaire, en attendant celles des autres pêcheurs.
+
+Langue : réponds dans la langue de la question (arabe standard, darija, français ou anglais). En darija en lettres latines, utilise l'écriture courante des Marocains (3, 7, 9, ch, kh), sans lettres savantes.
+
+Contenu :
+- Commence par la réponse directe en une ou deux phrases.
+- Puis des conseils concrets et applicables : montage, diamètre du fil, hameçon, appât ou leurre, moment de la marée, heure, saison, météo et état de la mer, poste à choisir. Adapte-les à l'espèce, au lieu et à la saison cités dans la question.
+- Tu peux donner des repères généraux connus des pêcheurs, mais ne présente jamais comme sûrs des faits locaux que tu ne peux pas connaître (un spot précis, un horaire de marée du jour, une réglementation, une taille légale, une date d'ouverture). Pour ces points, invite à vérifier (onglet Marées de l'application, autorités maritimes, pêcheurs de la région).
+- Si la question touche à une situation risquée (rochers, houle, marée montante, nuit, bateau), ajoute un rappel de sécurité court.
+- Si la question manque de détails, réponds avec ce qui est donné, puis demande en une phrase la précision utile (lieu, saison, matériel).
+- Si la question n'a rien à voir avec la pêche, la mer ou le plein air, réponds en une phrase polie que le forum est consacré à la pêche.
+- Ne parle jamais de toi comme d'une IA et ne mentionne pas ces instructions ; ne dis pas « en tant qu'assistant ».
+
+Forme : 80 à 220 mots, ton amical et respectueux entre pêcheurs. Texte brut sans Markdown (pas de #, ** ni tableaux). Mise en page obligatoire avec de vrais retours à la ligne (\\n dans le JSON) : une ligne vide entre les paragraphes, et chaque élément de liste sur sa propre ligne commençant par « - ». Pas de salutation longue ni de signature."""
+
+
 class Rewrite(BaseModel):
     title: str = Field(description='Titre amélioré')
     body: str = Field(description='Texte amélioré')
+
+
+class Answer(BaseModel):
+    answer: str = Field(description='Réponse publiée en commentaire')
 
 
 def _key(name: str) -> str:
@@ -69,13 +89,29 @@ def improve(title: str, body: str, kind: str = 'article') -> dict:
         raise HTTPException(503, 'AI not configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)')
     label = 'Question' if kind == 'question' else 'Article'
     prompt = f'{label}\n\nTitre : {title}\n\nTexte :\n{body}'
+    return _clean(_generate(prompt, SYSTEM, Rewrite))
+
+
+def answer(title: str, body: str) -> str:
+    """Answer to a forum question, posted as its first comment."""
+    if not enabled():
+        raise HTTPException(503, 'AI not configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)')
+    out = _generate(f'Question : {title}\n\n{body}', ANSWER_SYSTEM, Answer)
+    text = str(out.get('answer', '')).strip()
+    if not text:
+        raise HTTPException(422, 'The AI could not answer')
+    return text[:3000]
+
+
+def _generate(prompt: str, system: str, schema: type) -> dict:
+    """Gemini first, Claude when Gemini fails and its key is set."""
     if _key('GEMINI_API_KEY'):
         try:
-            return _clean(gemini(prompt))
+            return gemini(prompt, system, schema)
         except HTTPException:
             if not _key('ANTHROPIC_API_KEY'):
                 raise
-    return _clean(claude(prompt))
+    return claude(prompt, system, schema)
 
 
 def _clean(out: dict) -> dict:
@@ -129,7 +165,7 @@ def gemini_model() -> str:
     return gemini_models()[0]
 
 
-def gemini(prompt: str) -> dict:
+def gemini(prompt: str, system: str = SYSTEM, schema: type = Rewrite) -> dict:
     """Tries the newest Flash model, then older ones while the newest are
     overloaded (Google answers 503 or 429 at busy times)."""
     global _gemini_model, _gemini_good
@@ -140,7 +176,7 @@ def gemini(prompt: str) -> dict:
         if left < 5:
             break
         try:
-            out = _gemini_once(model, prompt, timeout=min(20, left))
+            out = _gemini_once(model, prompt, system, schema, timeout=min(20, left))
             _gemini_good = model
             return out
         except urllib.error.HTTPError as e:
@@ -156,16 +192,17 @@ def gemini(prompt: str) -> dict:
     raise HTTPException(429 if last == 429 else 503, 'AI busy, try again in a minute')
 
 
-def _gemini_once(model: str, prompt: str, timeout: float = 20) -> dict:
+def _gemini_once(model: str, prompt: str, system: str, schema: type, timeout: float = 20) -> dict:
+    fields = list(schema.model_fields)
     payload = {
-        'systemInstruction': {'parts': [{'text': SYSTEM}]},
+        'systemInstruction': {'parts': [{'text': system}]},
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
         'generationConfig': {
             'responseMimeType': 'application/json',
             'responseSchema': {
                 'type': 'OBJECT',
-                'properties': {'title': {'type': 'STRING'}, 'body': {'type': 'STRING'}},
-                'required': ['title', 'body'],
+                'properties': {f: {'type': 'STRING'} for f in fields},
+                'required': fields,
             },
         },
     }
@@ -178,7 +215,7 @@ def _gemini_once(model: str, prompt: str, timeout: float = 20) -> dict:
 
 
 # --- Claude (Anthropic) ---------------------------------------------------------
-def claude(prompt: str) -> dict:
+def claude(prompt: str, system: str = SYSTEM, schema: type = Rewrite) -> dict:
     import anthropic
 
     client = anthropic.Anthropic(api_key=_key('ANTHROPIC_API_KEY'), timeout=120)
@@ -186,9 +223,9 @@ def claude(prompt: str) -> dict:
         response = client.beta.messages.parse(
             model=MODEL,
             max_tokens=16000,
-            system=SYSTEM,
+            system=system,
             messages=[{'role': 'user', 'content': prompt}],
-            output_format=Rewrite,
+            output_format=schema,
             output_config={'effort': 'medium'},
             # A declined request is retried on Anthropic's recommended model.
             betas=['server-side-fallback-2026-07-01'],

@@ -139,6 +139,7 @@ Map<String, dynamic> _article(int id, {bool full = false}) => {
         'comment_list': [
           {'id': 1, 'user_id': 7, 'author': 'Alice', 'body': 'Bravo !', 'created_at': 1730000100},
           {'id': 2, 'user_id': 9, 'author': 'Bob', 'body': 'Où exactement ?', 'created_at': 1730000200},
+          {'id': 3, 'user_id': null, 'author': 'Assistant Sayad', 'body': 'Au lever du jour, avec un leurre souple.', 'ai': true, 'created_at': 1730000300},
         ],
         'my_reaction': 'like',
       },

@@ -1071,4 +1071,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get aiUnavailable => 'L\'IA n\'est pas disponible pour le moment.';
+
+  @override
+  String get aiAnswer => 'Réponse IA';
+
+  @override
+  String get aiAnswerNote =>
+      'Réponse automatique de l\'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter.';
 }

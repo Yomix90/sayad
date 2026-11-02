@@ -50,6 +50,7 @@ class ForumComment {
     required this.author,
     required this.body,
     required this.time,
+    this.ai = false,
   });
 
   final int id;
@@ -58,12 +59,16 @@ class ForumComment {
   final String body;
   final DateTime time;
 
+  /// Answer written by the server's AI.
+  final bool ai;
+
   factory ForumComment.fromJson(Map<String, dynamic> j) => ForumComment(
     id: (j['id'] as num).toInt(),
     userId: (j['user_id'] as num?)?.toInt(),
     author: j['author'] as String,
     body: j['body'] as String,
     time: _time(j['created_at']),
+    ai: j['ai'] == true || j['ai'] == 1,
   );
 }
 

@@ -467,12 +467,55 @@ def test_gemini_rewrite_and_claude_fallback():
         except Exception as e:
             assert getattr(e, 'status_code', None) == 429
         os.environ['ANTHROPIC_API_KEY'] = 'sk-test'
-        ai.claude = lambda prompt: {'title': 'Par Claude', 'body': 'ok'}
+        ai.claude = lambda prompt, *a: {'title': 'Par Claude', 'body': 'ok'}
         assert ai.improve('t', 'b')['title'] == 'Par Claude'
     finally:
         ai._gemini_call, ai.claude, ai._gemini_model = real_call, real_claude, None
         os.environ.pop('GEMINI_API_KEY', None)
         os.environ.pop('ANTHROPIC_API_KEY', None)
+
+
+def test_ai_answers_new_questions():
+    import time
+    import ai
+    forum.register_limit.clear()
+    forum.post_limit.clear()
+    h = _user('driss')
+    asked = []
+    real = ai.answer
+    ai.answer = lambda title, body: asked.append((title, body)) or 'Essayez le ver de mer à marée montante.'
+    os.environ['GEMINI_API_KEY'] = 'test-key'
+    try:
+        q = client.post('/forum/articles', headers=h, json={
+            'title': 'Quel appât pour le sar ?', 'body': 'A Agadir en novembre', 'kind': 'question'}).json()
+        # The answer comes from a background thread.
+        for _ in range(50):
+            comments = client.get(f"/forum/articles/{q['id']}").json()['comment_list']
+            if comments:
+                break
+            time.sleep(0.05)
+        assert asked == [('Quel appât pour le sar ?', 'A Agadir en novembre')]
+        assert comments[0]['author'] == 'Assistant Sayad' and comments[0]['ai'] is True
+        assert comments[0]['user_id'] is None
+
+        # Articles get no AI answer; AI_ANSWERS=0 turns them off.
+        a = client.post('/forum/articles', headers=h, json={'title': 'Ma sortie', 'body': 'Super'}).json()
+        os.environ['AI_ANSWERS'] = '0'
+        q2 = client.post('/forum/articles', headers=h, json={
+            'title': 'Et pour le loup ?', 'body': 'Merci', 'kind': 'question'}).json()
+        time.sleep(0.3)
+        assert client.get(f"/forum/articles/{a['id']}").json()['comment_list'] == []
+        assert client.get(f"/forum/articles/{q2['id']}").json()['comment_list'] == []
+        assert len(asked) == 1
+
+        # The admin asks for an answer to an older question.
+        r = client.post(f"/admin/api/forum/articles/{q2['id']}/ai-answer", headers=ADMIN).json()
+        assert r['ai'] and r['author'] == 'Assistant Sayad'
+        assert client.get(f"/admin/api/forum/articles/{q2['id']}/comments", headers=ADMIN).json()[0]['ai'] == 1
+    finally:
+        ai.answer = real
+        os.environ.pop('GEMINI_API_KEY', None)
+        os.environ.pop('AI_ANSWERS', None)
 
 
 def test_dashboard_javascript_is_valid():

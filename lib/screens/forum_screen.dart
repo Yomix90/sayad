@@ -499,11 +499,31 @@ class _ArticleScreenState extends State<ArticleScreen> {
     try {
       final a = await AppScope.of(context).forum.article(_a.id);
       if (mounted) setState(() => _a = a);
+      _waitForAiAnswer();
     } catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  int _aiChecks = 0;
+
+  /// A new question gets an AI answer a few seconds after it is posted:
+  /// look again every 5 seconds for a minute.
+  void _waitForAiAnswer() {
+    final fresh =
+        DateTime.now().difference(_a.time) < const Duration(minutes: 2);
+    if (_a.kind != 'question' ||
+        !fresh ||
+        _a.comments.any((c) => c.ai) ||
+        _aiChecks >= 12) {
+      return;
+    }
+    _aiChecks++;
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) _reload();
+    });
   }
 
   Future<bool> _needLogin() async =>
@@ -807,12 +827,16 @@ class _CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
+    final t = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
       decoration: BoxDecoration(
-        color: p.surface2,
+        color: comment.ai ? p.accent.withValues(alpha: 0.12) : p.surface2,
         borderRadius: BorderRadius.circular(p.radiusS),
+        border: comment.ai
+            ? Border.all(color: p.accent.withValues(alpha: 0.5))
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -821,19 +845,39 @@ class _CommentTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '\u2068${comment.author}\u2069 · ${_date(context, comment.time)}',
-                  style: TextStyle(
-                    color: p.muted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    if (comment.ai) ...[
+                      StatusChip(label: '🤖 ${t.aiAnswer}', tone: ChipTone.ok),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                        '\u2068${comment.author}\u2069 · ${_date(context, comment.time)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 3),
                 LinkText(
                   comment.body,
                   style: TextStyle(color: p.text, fontSize: 14.5, height: 1.4),
                 ),
+                if (comment.ai)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      t.aiAnswerNote,
+                      style: TextStyle(color: p.muted, fontSize: 11.5),
+                    ),
+                  ),
               ],
             ),
           ),

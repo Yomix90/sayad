@@ -1062,4 +1062,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiUnavailable => 'AI is not available right now.';
+
+  @override
+  String get aiAnswer => 'AI answer';
+
+  @override
+  String get aiAnswerNote =>
+      'Automatic answer from the Sayad assistant: check it; anglers on the forum can add to it.';
 }
