@@ -23,6 +23,8 @@ from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Requ
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+import ai
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS articles (
   status TEXT NOT NULL DEFAULT 'published',
   source TEXT NOT NULL DEFAULT 'app',
   ext_id TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'article',
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS articles_list ON articles(status, category, created_at);
@@ -67,6 +70,19 @@ CREATE TABLE IF NOT EXISTS reactions (
   PRIMARY KEY (article_id, user_id)
 );
 """
+
+Kind = Literal['article', 'question']
+ADMIN_AUTHOR = 'Admin'
+
+
+def migrate(c) -> None:
+    """Columns added after the first version of the forum."""
+    have = {r[1] for r in c.execute('PRAGMA table_info(articles)')}
+    if 'kind' not in have:
+        c.execute("ALTER TABLE articles ADD COLUMN kind TEXT NOT NULL DEFAULT 'article'")
+        # The old forum's Q&A section holds questions.
+        c.execute("UPDATE articles SET kind = 'question' WHERE category = 'qa'")
+
 
 CATEGORIES = ['general', 'surfcasting', 'spinning', 'pole', 'boat', 'qa', 'catches', 'videos']
 Category = Literal['general', 'surfcasting', 'spinning', 'pole', 'boat', 'qa', 'catches', 'videos']
@@ -136,6 +152,7 @@ login_limit = Limiter(20, 900)
 post_limit = Limiter(10, 3600)
 comment_limit = Limiter(60, 3600)
 upload_limit = Limiter(40, 3600)
+ai_limit = Limiter(10, 3600)
 
 
 # --- Old app articles ----------------------------------------------------------
@@ -160,9 +177,8 @@ def parse_old_article(a: dict) -> dict:
     """Title, body, author and date of one encyclopedia article. The text ends
     with the date (dd-mm-yyyy) and the author's name on their own lines."""
     lines = [l.rstrip() for l in (a.get('texte') or '').strip().split('\n')]
-    author, created = 'TIFNIT', None
+    author, created = ADMIN_AUTHOR, None
     if len(lines) >= 2 and DATE_RE.match(lines[-2].strip()):
-        author = lines[-1].strip() or author
         d, m, y = DATE_RE.match(lines[-2].strip()).groups()
         created = datetime(int(y), int(m), int(d), 12, tzinfo=timezone.utc)
         lines = lines[:-2]
@@ -186,6 +202,7 @@ def parse_old_article(a: dict) -> dict:
         'body': html.unescape(body) or '-',
         'author': author[:60],
         'category': category,
+        'kind': 'question' if category == 'qa' else 'article',
         'images': images,
         # Undated articles go after the dated ones (the old forum began in 2016).
         'created_at': int(created.timestamp()) if created else OLD_UNDATED,
@@ -295,7 +312,7 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
             'id': r['id'], 'title': r['title'], 'category': r['category'],
             'excerpt': body[:220] + ('…' if len(body) > 220 else ''),
             'author': r['author_name'], 'user_id': r['user_id'], 'images': images,
-            'created_at': r['created_at'], 'source': r['source'],
+            'created_at': r['created_at'], 'source': r['source'], 'kind': r['kind'],
             'comments': com.get(r['id'], 0), 'reactions': rea.get(r['id'], {}),
         }
 
@@ -304,9 +321,12 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         return CATEGORIES
 
     @router.get('/forum/articles')
-    def list_articles(category: str = '', q: str = '', offset: int = Query(0, ge=0),
+    def list_articles(category: str = '', q: str = '', kind: str = '', offset: int = Query(0, ge=0),
                       limit: int = Query(20, ge=1, le=100)):
         where, args = ['status = "published"'], []
+        if kind:
+            where.append('kind = ?')
+            args.append(kind)
         if category:
             where.append('category = ?')
             args.append(category)
@@ -348,6 +368,7 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         title: str = Field(min_length=3, max_length=200)
         body: str = Field(min_length=1, max_length=20000)
         category: Category = 'general'
+        kind: Kind = 'article'
         images: List[str] = Field(default=[], max_length=10)
 
     @router.post('/forum/articles', status_code=201)
@@ -356,10 +377,10 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         # Only images uploaded to this server.
         images = [u for u in a.images if re.fullmatch(r'/media/[\w-]+\.(jpg|png|gif|webp)', u)]
         with db() as c:
-            cur = c.execute('INSERT INTO articles(user_id, author_name, title, body, category, images, '
-                            'source, created_at) VALUES (?,?,?,?,?,?, "app", ?)',
+            cur = c.execute('INSERT INTO articles(user_id, author_name, title, body, category, kind, images, '
+                            'source, created_at) VALUES (?,?,?,?,?,?,?, "app", ?)',
                             (user['id'], user['display_name'], a.title.strip(), a.body.strip(),
-                             a.category, json.dumps(images), int(time.time())))
+                             a.category, a.kind, json.dumps(images), int(time.time())))
             return load_article(c, cur.lastrowid, user)
 
     @router.delete('/forum/articles/{article_id}')
@@ -410,6 +431,21 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
             raise HTTPException(404, 'Not found')
         return {'deleted': comment_id}
 
+    class ImproveIn(BaseModel):
+        title: str = Field(default='', max_length=200)
+        body: str = Field(min_length=1, max_length=20000)
+        kind: Kind = 'article'
+
+    @router.get('/forum/ai')
+    def ai_status():
+        return {'enabled': ai.enabled()}
+
+    @router.post('/forum/ai/improve')
+    def ai_improve(body: ImproveIn, user: dict = Depends(need_user)):
+        """Suggests a clearer version of the text being written (not saved)."""
+        ai_limit.hit(user['id'])
+        return ai.improve(body.title, body.body, body.kind)
+
     # --- Images ---------------------------------------------------------------
     def save_image(data: bytes) -> str:
         ext = image_ext(data)
@@ -439,10 +475,11 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         return FileResponse(path, headers={'Cache-Control': 'public, max-age=31536000, immutable'})
 
     # --- Admin ------------------------------------------------------------------
-    @router.get('/admin/api/forum/articles', dependencies=admin)
-    def admin_articles(q: str = '', source: str = '', status: str = '',
-                       offset: int = 0, limit: int = Query(50, le=1000)):
+    def admin_filter(q: str, source: str, status: str, kind: str):
         where, args = [], []
+        if kind:
+            where.append('kind = ?')
+            args.append(kind)
         if q:
             where.append('(title LIKE ? OR body LIKE ? OR author_name LIKE ?)')
             args += [f'%{q}%'] * 3
@@ -452,7 +489,12 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
         if status:
             where.append('status = ?')
             args.append(status)
-        sql = ('WHERE ' + ' AND '.join(where)) if where else ''
+        return ('WHERE ' + ' AND '.join(where)) if where else '', args
+
+    @router.get('/admin/api/forum/articles', dependencies=admin)
+    def admin_articles(q: str = '', source: str = '', status: str = '', kind: str = '',
+                       offset: int = 0, limit: int = Query(50, le=1000)):
+        sql, args = admin_filter(q, source, status, kind)
         with db() as c:
             total = c.execute(f'SELECT COUNT(*) FROM articles {sql}', args).fetchone()[0]
             rows = c.execute(f'SELECT * FROM articles {sql} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
@@ -462,24 +504,71 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
             for r in rows:
                 s = summary(r, com, rea)
                 s['status'] = r['status']
+                s['body'] = r['body']
                 items.append(s)
             stats = {
-                'articles': c.execute('SELECT COUNT(*) FROM articles').fetchone()[0],
+                'articles': c.execute("SELECT COUNT(*) FROM articles WHERE kind = 'article'").fetchone()[0],
+                'questions': c.execute("SELECT COUNT(*) FROM articles WHERE kind = 'question'").fetchone()[0],
                 'comments': c.execute('SELECT COUNT(*) FROM comments').fetchone()[0],
                 'users': c.execute('SELECT COUNT(*) FROM users').fetchone()[0],
             }
-        return {'total': total, 'items': items, 'stats': stats, 'images': image_job.copy()}
+        return {'total': total, 'items': items, 'stats': stats, 'images': image_job.copy(),
+                'ai': ai.enabled()}
 
-    class ArticleStatus(BaseModel):
-        status: Literal['published', 'hidden']
+    class ArticleEdit(BaseModel):
+        status: Optional[Literal['published', 'hidden']] = None
+        kind: Optional[Kind] = None
+        category: Optional[Category] = None
+        title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+        body: Optional[str] = Field(default=None, min_length=1, max_length=20000)
+        author_name: Optional[str] = Field(default=None, min_length=1, max_length=60)
 
     @router.put('/admin/api/forum/articles/{article_id}', dependencies=admin)
-    def admin_article_status(article_id: int, body: ArticleStatus):
+    def admin_article_edit(article_id: int, body: ArticleEdit):
+        fields = body.model_dump(exclude_none=True)
+        if not fields:
+            raise HTTPException(400, 'Nothing to change')
+        sets = ', '.join(f'{k} = ?' for k in fields)
         with db() as c:
-            cur = c.execute('UPDATE articles SET status = ? WHERE id = ?', (body.status, article_id))
+            cur = c.execute(f'UPDATE articles SET {sets} WHERE id = ?', list(fields.values()) + [article_id])
         if cur.rowcount == 0:
             raise HTTPException(404, 'Not found')
-        return {'id': article_id, 'status': body.status}
+        return {'id': article_id, **fields}
+
+    class ArticlesBulk(BaseModel):
+        """An action on [ids], or on every article matching the filters."""
+        action: Literal['author_admin', 'to_question', 'to_article', 'hide', 'publish']
+        ids: List[int] = []
+        all_matching: bool = False
+        q: str = ''
+        source: str = ''
+        status: str = ''
+        kind: str = ''
+
+    @router.post('/admin/api/forum/articles/bulk', dependencies=admin)
+    def admin_articles_bulk(body: ArticlesBulk):
+        change = {
+            'author_admin': ('author_name', ADMIN_AUTHOR), 'to_question': ('kind', 'question'),
+            'to_article': ('kind', 'article'), 'hide': ('status', 'hidden'), 'publish': ('status', 'published'),
+        }[body.action]
+        if body.all_matching:
+            sql, args = admin_filter(body.q, body.source, body.status, body.kind)
+        elif body.ids:
+            sql, args = f'WHERE id IN ({",".join("?" * len(body.ids))})', list(body.ids)
+        else:
+            return {'changed': 0}
+        with db() as c:
+            cur = c.execute(f'UPDATE articles SET {change[0]} = ? {sql}', [change[1]] + args)
+        return {'changed': cur.rowcount}
+
+    @router.post('/admin/api/forum/articles/{article_id}/improve', dependencies=admin)
+    def admin_improve(article_id: int):
+        """AI suggestion for an article; saved only by a following PUT."""
+        with db() as c:
+            r = c.execute('SELECT title, body, kind FROM articles WHERE id = ?', (article_id,)).fetchone()
+        if r is None:
+            raise HTTPException(404, 'Not found')
+        return ai.improve(r['title'], r['body'], r['kind'])
 
     @router.delete('/admin/api/forum/articles/{article_id}', dependencies=admin)
     def admin_delete_article(article_id: int):
@@ -559,9 +648,9 @@ def create_router(db, require_admin, media_dir, old_app_dir) -> APIRouter:
                                                (art['ext_id'],)).fetchone():
                     result['duplicates'] += 1
                     continue
-                c.execute('INSERT INTO articles(user_id, author_name, title, body, category, images, '
-                          'source, ext_id, created_at) VALUES (NULL,?,?,?,?,?, "tifnit", ?, ?)',
-                          (art['author'], art['title'], art['body'], art['category'],
+                c.execute('INSERT INTO articles(user_id, author_name, title, body, category, kind, images, '
+                          'source, ext_id, created_at) VALUES (NULL,?,?,?,?,?,?, "tifnit", ?, ?)',
+                          (art['author'], art['title'], art['body'], art['category'], art['kind'],
                            json.dumps(art['images']), art['ext_id'], art['created_at']))
                 result['inserted'] += 1
             c.execute('INSERT INTO import_log(file, tbl, target, inserted, at) VALUES (?, "forum", "articles", ?, ?)',

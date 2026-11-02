@@ -1040,4 +1040,35 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get wxDataNote =>
       'Modèles ECMWF, ICON, GFS, Météo-France. Zoomez pour plus de détails.';
+
+  @override
+  String get forumArticles => 'Articles';
+
+  @override
+  String get forumQuestions => 'Questions';
+
+  @override
+  String get askQuestion => 'Poser une question';
+
+  @override
+  String get questionBadge => 'Question';
+
+  @override
+  String get kindArticle => 'Article';
+
+  @override
+  String get kindQuestion => 'Question';
+
+  @override
+  String get aiImprove => 'Améliorer avec l\'IA';
+
+  @override
+  String get aiImproved =>
+      'Texte amélioré par l\'IA. Relisez-le avant de publier.';
+
+  @override
+  String get aiUndo => 'Revenir à mon texte';
+
+  @override
+  String get aiUnavailable => 'L\'IA n\'est pas disponible pour le moment.';
 }

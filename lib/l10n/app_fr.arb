@@ -411,5 +411,15 @@
         "type": "String"
       }
     }
-  }
+  },
+  "forumArticles": "Articles",
+  "forumQuestions": "Questions",
+  "askQuestion": "Poser une question",
+  "questionBadge": "Question",
+  "kindArticle": "Article",
+  "kindQuestion": "Question",
+  "aiImprove": "Améliorer avec l'IA",
+  "aiImproved": "Texte amélioré par l'IA. Relisez-le avant de publier.",
+  "aiUndo": "Revenir à mon texte",
+  "aiUnavailable": "L'IA n'est pas disponible pour le moment."
 }

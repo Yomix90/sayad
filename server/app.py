@@ -97,6 +97,7 @@ def init_db(path: Optional[str] = None) -> None:
     with sqlite3.connect(path) as c:
         c.executescript(SCHEMA)
         c.executescript(forum.SCHEMA)
+        forum.migrate(c)
         for table, cols in MIGRATIONS.items():
             have = {r[1] for r in c.execute(f'PRAGMA table_info({table})')}
             for col, decl in cols.items():

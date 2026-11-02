@@ -1029,4 +1029,34 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get wxDataNote =>
       'نماذج ECMWF وICON وGFS وMétéo-France. قرّب الخريطة لمزيد من التفاصيل.';
+
+  @override
+  String get forumArticles => 'مقالات';
+
+  @override
+  String get forumQuestions => 'أسئلة';
+
+  @override
+  String get askQuestion => 'اطرح سؤالًا';
+
+  @override
+  String get questionBadge => 'سؤال';
+
+  @override
+  String get kindArticle => 'مقال';
+
+  @override
+  String get kindQuestion => 'سؤال';
+
+  @override
+  String get aiImprove => 'تحسين بالذكاء الاصطناعي';
+
+  @override
+  String get aiImproved => 'حسّن الذكاء الاصطناعي النص. راجعه قبل النشر.';
+
+  @override
+  String get aiUndo => 'العودة إلى نصي';
+
+  @override
+  String get aiUnavailable => 'الذكاء الاصطناعي غير متاح حاليًا.';
 }

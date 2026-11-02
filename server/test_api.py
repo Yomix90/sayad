@@ -305,7 +305,7 @@ def test_forum_accounts_articles_reactions_comments():
 def test_forum_import_old_articles():
     import json
     a = forum.parse_old_article(OLD_ARTICLES[0])
-    assert a['author'] == 'لكديرة' and a['category'] == 'qa'
+    assert a['author'] == 'Admin' and a['category'] == 'qa' and a['kind'] == 'question'
     assert a['body'] == 'Premier paragraphe.\nDeuxième ligne.\n\nhttps://www.youtube.com/watch?v=abcdefghijk'
     assert a['created_at'] == 1514721600 and a['ext_id'] == 'tifnit:80'
 
@@ -367,6 +367,103 @@ def test_weather_grid_cache():
                                                    'longitude': ','.join(['1'] * 201)}).status_code == 422
     finally:
         weather.fetch = real
+
+
+def test_forum_kinds_bulk_and_ai():
+    import ai
+    forum.register_limit.clear()
+    forum.ai_limit.clear()
+    h = _user('carla')
+    q = client.post('/forum/articles', headers=h, json={
+        'title': 'Quel leurre pour le bar ?', 'body': 'A Essaouira en hiver', 'kind': 'question'}).json()
+    art = client.post('/forum/articles', headers=h, json={'title': 'Sortie à Mirleft', 'body': 'Belle journée'}).json()
+    assert q['kind'] == 'question' and art['kind'] == 'article'
+    kinds = lambda k: {x['id'] for x in client.get('/forum/articles', params={'kind': k, 'limit': 100}).json()['items']}
+    assert q['id'] in kinds('question') and q['id'] not in kinds('article')
+
+    # Admin: every filtered article signed Admin, one switched to a question.
+    r = client.post('/admin/api/forum/articles/bulk', headers=ADMIN,
+                    json={'action': 'author_admin', 'all_matching': True}).json()
+    assert r['changed'] >= 2
+    assert {x['author'] for x in client.get('/forum/articles', params={'limit': 100}).json()['items']} == {'Admin'}
+    client.post('/admin/api/forum/articles/bulk', headers=ADMIN, json={'action': 'to_question', 'ids': [art['id']]})
+    assert art['id'] in kinds('question')
+    stats = client.get('/admin/api/forum/articles', headers=ADMIN, params={'kind': 'question'}).json()
+    assert all(x['kind'] == 'question' for x in stats['items']) and stats['stats']['questions'] >= 2
+
+    # AI: refused without a key, otherwise a suggestion the admin saves.
+    os.environ.pop('ANTHROPIC_API_KEY', None)
+    os.environ.pop('GEMINI_API_KEY', None)
+    assert client.get('/forum/ai').json() == {'enabled': False}
+    assert client.post(f"/admin/api/forum/articles/{art['id']}/improve", headers=ADMIN).status_code == 503
+    seen = []
+    real = ai.improve
+    def fake(title, body, kind='article'):
+        seen.append((title, body, kind))
+        return {'title': title + ' (revu)', 'body': body + '.'}
+    ai.improve = fake
+    try:
+        s = client.post(f"/admin/api/forum/articles/{art['id']}/improve", headers=ADMIN).json()
+        assert s == {'title': 'Sortie à Mirleft (revu)', 'body': 'Belle journée.'}
+        assert seen[-1][2] == 'question'
+        client.put(f"/admin/api/forum/articles/{art['id']}", headers=ADMIN, json=s)
+        assert client.get(f"/forum/articles/{art['id']}").json()['body'] == 'Belle journée.'
+        # Users while writing; login required.
+        assert client.post('/forum/ai/improve', json={'body': 'x'}).status_code == 401
+        assert client.post('/forum/ai/improve', headers=h, json={'title': 'T', 'body': 'b'}).json()['body'] == 'b.'
+    finally:
+        ai.improve = real
+
+
+def test_gemini_rewrite_and_claude_fallback():
+    import json
+    import urllib.error
+    import ai
+    sent = []
+
+    def fake_call(path, payload=None):
+        sent.append((path, payload))
+        if path.startswith('models?'):
+            return {'models': [
+                {'name': 'models/gemini-2.5-flash', 'supportedGenerationMethods': ['generateContent']},
+                {'name': 'models/gemini-3.6-flash', 'supportedGenerationMethods': ['generateContent']},
+                {'name': 'models/gemini-3.6-flash-lite', 'supportedGenerationMethods': ['generateContent']},
+                {'name': 'models/gemini-3.7-pro', 'supportedGenerationMethods': ['generateContent']},
+                {'name': 'models/text-embedding-004', 'supportedGenerationMethods': ['embedContent']},
+            ]}
+        text = json.dumps({'title': 'Le bar en hiver', 'body': 'Quel leurre utiliser ?'})
+        return {'candidates': [{'content': {'parts': [{'text': text}]}}]}
+
+    real_call, real_claude = ai._gemini_call, ai.claude
+    ai._gemini_call, ai._gemini_model = fake_call, None
+    os.environ['GEMINI_API_KEY'] = 'test-key'
+    try:
+        assert ai.enabled()
+        out = ai.improve('bar', 'quel leure pour le bar', 'question')
+        assert out == {'title': 'Le bar en hiver', 'body': 'Quel leurre utiliser ?'}
+        # Newest free Flash model, the system prompt and a JSON answer.
+        path, payload = sent[-1]
+        assert path == 'models/gemini-3.6-flash:generateContent'
+        assert 'Sayad' in payload['systemInstruction']['parts'][0]['text']
+        assert payload['generationConfig']['responseMimeType'] == 'application/json'
+        assert payload['contents'][0]['parts'][0]['text'].startswith('Question')
+
+        # Gemini over its free quota: Claude takes over when its key is set.
+        def busy(path, payload=None):
+            raise urllib.error.HTTPError('u', 429, 'quota', {}, None)
+        ai._gemini_call = busy
+        try:
+            ai.improve('t', 'b')
+            assert False, 'expected 429'
+        except Exception as e:
+            assert getattr(e, 'status_code', None) == 429
+        os.environ['ANTHROPIC_API_KEY'] = 'sk-test'
+        ai.claude = lambda prompt: {'title': 'Par Claude', 'body': 'ok'}
+        assert ai.improve('t', 'b')['title'] == 'Par Claude'
+    finally:
+        ai._gemini_call, ai.claude, ai._gemini_model = real_call, real_claude, None
+        os.environ.pop('GEMINI_API_KEY', None)
+        os.environ.pop('ANTHROPIC_API_KEY', None)
 
 
 def test_dashboard_javascript_is_valid():

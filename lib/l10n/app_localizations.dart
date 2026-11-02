@@ -2031,6 +2031,66 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Modèles ECMWF, ICON, GFS, Météo-France. Zoomez pour plus de détails.'**
   String get wxDataNote;
+
+  /// No description provided for @forumArticles.
+  ///
+  /// In fr, this message translates to:
+  /// **'Articles'**
+  String get forumArticles;
+
+  /// No description provided for @forumQuestions.
+  ///
+  /// In fr, this message translates to:
+  /// **'Questions'**
+  String get forumQuestions;
+
+  /// No description provided for @askQuestion.
+  ///
+  /// In fr, this message translates to:
+  /// **'Poser une question'**
+  String get askQuestion;
+
+  /// No description provided for @questionBadge.
+  ///
+  /// In fr, this message translates to:
+  /// **'Question'**
+  String get questionBadge;
+
+  /// No description provided for @kindArticle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Article'**
+  String get kindArticle;
+
+  /// No description provided for @kindQuestion.
+  ///
+  /// In fr, this message translates to:
+  /// **'Question'**
+  String get kindQuestion;
+
+  /// No description provided for @aiImprove.
+  ///
+  /// In fr, this message translates to:
+  /// **'Améliorer avec l\'IA'**
+  String get aiImprove;
+
+  /// No description provided for @aiImproved.
+  ///
+  /// In fr, this message translates to:
+  /// **'Texte amélioré par l\'IA. Relisez-le avant de publier.'**
+  String get aiImproved;
+
+  /// No description provided for @aiUndo.
+  ///
+  /// In fr, this message translates to:
+  /// **'Revenir à mon texte'**
+  String get aiUndo;
+
+  /// No description provided for @aiUnavailable.
+  ///
+  /// In fr, this message translates to:
+  /// **'L\'IA n\'est pas disponible pour le moment.'**
+  String get aiUnavailable;
 }
 
 class _AppLocalizationsDelegate

@@ -321,5 +321,15 @@
   "noPhone": "لا يوجد رقم هاتف",
   "wxMapError": "بيانات الطقس غير متوفرة.",
   "wxNow": "الآن",
-  "wxDataNote": "نماذج ECMWF وICON وGFS وMétéo-France. قرّب الخريطة لمزيد من التفاصيل."
+  "wxDataNote": "نماذج ECMWF وICON وGFS وMétéo-France. قرّب الخريطة لمزيد من التفاصيل.",
+  "forumArticles": "مقالات",
+  "forumQuestions": "أسئلة",
+  "askQuestion": "اطرح سؤالًا",
+  "questionBadge": "سؤال",
+  "kindArticle": "مقال",
+  "kindQuestion": "سؤال",
+  "aiImprove": "تحسين بالذكاء الاصطناعي",
+  "aiImproved": "حسّن الذكاء الاصطناعي النص. راجعه قبل النشر.",
+  "aiUndo": "العودة إلى نصي",
+  "aiUnavailable": "الذكاء الاصطناعي غير متاح حاليًا."
 }

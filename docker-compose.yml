@@ -13,6 +13,11 @@ services:
       SAYAD_DB: /data/sayad.db
       OLD_APP_DIR: /data/old_app
       MEDIA_DIR: /data/media
+      # Optional: AI rewriting of forum articles. Gemini (free tier,
+      # aistudio.google.com) is used first, Claude (console.anthropic.com) as backup.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - sayad-data:/data
     expose:

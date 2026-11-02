@@ -181,10 +181,17 @@
       <div id="fArticles">
         <div class="bar">
           <select id="fSource"><option value="">Toutes les sources</option><option value="app">Application</option><option value="tifnit">Ancienne app</option></select>
+          <select id="fKind"><option value="">Articles et questions</option><option value="article">Articles</option><option value="question">Questions</option></select>
           <select id="fStatus"><option value="">Tous</option><option value="published">Publiés</option><option value="hidden">Masqués</option></select>
           <input type="search" id="fq" placeholder="Titre, texte ou auteur…">
           <span id="fPage" class="muted"></span>
           <button id="fPrev">←</button><button id="fNext">→</button>
+        </div>
+        <div class="bar">
+          <span class="muted">Pour tous les éléments du filtre :</span>
+          <button data-fbulk="author_admin">Auteur → Admin</button>
+          <button data-fbulk="to_question">Changer en questions</button>
+          <button data-fbulk="to_article">Changer en articles</button>
         </div>
         <table>
           <thead><tr><th></th><th>Article</th><th>Auteur</th><th>Date</th><th>Réactions</th><th>Statut</th><th></th></tr></thead>
@@ -228,6 +235,24 @@
     <div class="bar" style="margin-top:16px;justify-content:flex-end">
       <button value="cancel" formnovalidate>Annuler</button>
       <button class="primary" value="save" id="saveBtn">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="artDlg">
+  <form method="dialog">
+    <h3 id="artDlgTitle">Modifier</h3>
+    <p id="artDlgNote" class="muted"></p>
+    <label>Titre<input id="artTitle" dir="auto" maxlength="200"></label>
+    <label>Texte<textarea id="artBody" rows="14" dir="auto"></textarea></label>
+    <div class="grid2">
+      <label>Type<select id="artKind"><option value="article">Article</option><option value="question">Question</option></select></label>
+      <label>Auteur<input id="artAuthor" dir="auto" maxlength="60"></label>
+    </div>
+    <details style="margin-top:10px"><summary class="muted">Texte d'origine</summary><pre id="artOrig" style="white-space:pre-wrap"></pre></details>
+    <div class="bar" style="margin-top:16px;justify-content:flex-end">
+      <button value="cancel" formnovalidate>Annuler</button>
+      <button class="primary" value="save" id="artSave">Enregistrer</button>
     </div>
   </form>
 </dialog>
@@ -543,7 +568,7 @@ $('#uploadBtn').onclick = async () => {
   catch (e) { toast('Erreur : ' + e.message); }
 };
 // --- Forum ---
-const forum = { view: 'articles', q: '', source: '', status: '', offset: 0, limit: 50, items: [] };
+const forum = { view: 'articles', q: '', source: '', status: '', kind: '', offset: 0, limit: 50, items: [], ai: false };
 const reactIcons = { like: '👍', love: '❤️', fish: '🐟', wow: '😮' };
 const day = t => new Date(t * 1000).toLocaleDateString('fr-FR');
 let imgTimer;
@@ -570,21 +595,26 @@ async function loadForum() {
   };
   showImages(imp.images);
   if (forum.view === 'users') return loadUsers();
-  const p = new URLSearchParams({ q: forum.q, source: forum.source, status: forum.status, offset: forum.offset, limit: forum.limit });
+  const p = new URLSearchParams({ q: forum.q, source: forum.source, status: forum.status, kind: forum.kind, offset: forum.offset, limit: forum.limit });
   const r = await api('/admin/api/forum/articles?' + p);
   forum.items = r.items;
+  forum.ai = r.ai;
   const card = (v, l) => `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`;
-  $('#forumCards').innerHTML = card(r.stats.articles, 'Articles') + card(r.stats.comments, 'Commentaires') + card(r.stats.users, 'Utilisateurs');
+  $('#forumCards').innerHTML = card(r.stats.articles, 'Articles') + card(r.stats.questions, 'Questions') + card(r.stats.comments, 'Commentaires') + card(r.stats.users, 'Utilisateurs');
   $('#fPage').textContent = r.total ? `${forum.offset + 1}–${Math.min(forum.offset + forum.limit, r.total)} sur ${r.total}` : 'Aucun article';
   $('#fRows').innerHTML = r.items.map(a => `<tr data-id="${a.id}">
       <td>${a.images[0] ? `<img class="thumb" loading="lazy" src="${esc(a.images[0])}" alt="">` : ''}</td>
       <td><b dir="auto">${esc(a.title)}</b><div class="excerpt" dir="auto">${esc(a.excerpt)}</div>
+        <span class="pill ${a.kind === 'question' ? 'pending' : 'approved'}">${a.kind === 'question' ? 'Question' : 'Article'}</span>
         <span class="muted" style="font-size:12px">${esc(a.category)} · ${a.images.length} image(s) · ${a.source === 'tifnit' ? 'ancienne app' : 'application'}</span></td>
       <td dir="auto">${esc(a.author)}</td>
       <td class="n">${day(a.created_at)}</td>
       <td class="n">${Object.entries(a.reactions).map(([k, v]) => reactIcons[k] + ' ' + v).join(' ') || '—'}<br>💬 ${a.comments}</td>
       <td><span class="pill ${a.status === 'published' ? 'approved' : 'rejected'}">${a.status === 'published' ? 'Publié' : 'Masqué'}</span></td>
       <td class="actions">
+        <button data-fact="edit" title="Modifier">✏️</button>
+        <button data-fact="ai" title="${forum.ai ? 'Réécrire avec l\'IA' : 'IA non configurée : GEMINI_API_KEY ou ANTHROPIC_API_KEY'}" ${forum.ai ? '' : 'disabled'}>✨ IA</button>
+        <button data-fact="kind">${a.kind === 'question' ? '→ Article' : '→ Question'}</button>
         <button data-fact="comments">💬</button>
         <button data-fact="toggle">${a.status === 'published' ? 'Masquer' : 'Publier'}</button>
         <button class="danger" data-fact="delete">🗑</button>
@@ -612,6 +642,17 @@ $('#fRows').onclick = async e => {
   const id = +b.closest('tr').dataset.id, a = forum.items.find(x => x.id === id);
   try {
     if (b.dataset.fact === 'comments') return openComments(a);
+    if (b.dataset.fact === 'edit') return openArticle(a, null);
+    if (b.dataset.fact === 'ai') {
+      b.disabled = true; b.textContent = '…';
+      try { openArticle(a, await api(`/admin/api/forum/articles/${id}/improve`, { method: 'POST' })); }
+      finally { b.disabled = false; b.textContent = '✨ IA'; }
+      return;
+    }
+    if (b.dataset.fact === 'kind') {
+      await api(`/admin/api/forum/articles/${id}`, { method: 'PUT', body: JSON.stringify({ kind: a.kind === 'question' ? 'article' : 'question' }) });
+      return loadForum();
+    }
     if (b.dataset.fact === 'toggle') {
       await api(`/admin/api/forum/articles/${id}`, { method: 'PUT', body: JSON.stringify({ status: a.status === 'published' ? 'hidden' : 'published' }) });
     } else {
@@ -646,6 +687,36 @@ let fqTimer; $('#fq').oninput = e => { clearTimeout(fqTimer); fqTimer = setTimeo
 let uqTimer; $('#uq').oninput = () => { clearTimeout(uqTimer); uqTimer = setTimeout(loadUsers, 300); };
 $('#fSource').onchange = e => { forum.source = e.target.value; forum.offset = 0; loadForum(); };
 $('#fStatus').onchange = e => { forum.status = e.target.value; forum.offset = 0; loadForum(); };
+$('#fKind').onchange = e => { forum.kind = e.target.value; forum.offset = 0; loadForum(); };
+$$('[data-fbulk]').forEach(b => b.onclick = async () => {
+  const what = { author_admin: "mettre « Admin » comme auteur de", to_question: 'changer en questions', to_article: 'changer en articles' }[b.dataset.fbulk];
+  if (!confirm(`Voulez-vous ${what} tous les éléments du filtre actuel ?`)) return;
+  try {
+    const r = await api('/admin/api/forum/articles/bulk', { method: 'POST', body: JSON.stringify({
+      action: b.dataset.fbulk, all_matching: true, q: forum.q, source: forum.source, status: forum.status, kind: forum.kind }) });
+    toast(`${r.changed} élément(s) modifié(s)`); loadForum();
+  } catch (err) { toast('Erreur : ' + err.message); }
+});
+// Edit an article; with [suggestion], the AI's version is shown to check before saving.
+function openArticle(a, suggestion) {
+  $('#artDlgTitle').textContent = suggestion ? "Proposition de l'IA" : 'Modifier';
+  $('#artDlgNote').textContent = suggestion ? "Relisez et corrigez si besoin, puis enregistrez. Rien n'est changé avant." : '';
+  $('#artTitle').value = suggestion ? suggestion.title : a.title;
+  $('#artBody').value = suggestion ? suggestion.body : a.body;
+  $('#artKind').value = a.kind;
+  $('#artAuthor').value = a.author;
+  $('#artOrig').textContent = a.title + '\n\n' + a.body;
+  $('#artDlg').onclose = async () => {
+    if ($('#artDlg').returnValue !== 'save') return;
+    try {
+      await api(`/admin/api/forum/articles/${a.id}`, { method: 'PUT', body: JSON.stringify({
+        title: $('#artTitle').value.trim(), body: $('#artBody').value.trim(),
+        kind: $('#artKind').value, author_name: $('#artAuthor').value.trim() || 'Admin' }) });
+      toast('Article enregistré'); loadForum();
+    } catch (err) { toast('Erreur : ' + err.message); }
+  };
+  $('#artDlg').showModal();
+}
 $('#fPrev').onclick = () => { forum.offset = Math.max(0, forum.offset - forum.limit); loadForum(); };
 $('#fNext').onclick = () => { forum.offset += forum.limit; loadForum(); };
 

@@ -114,6 +114,32 @@ void main() {
     }
   }
 
+  testWidgets('questions tab and AI rewrite while writing', (tester) async {
+    phoneView(tester);
+    final state = await testState();
+    await state.setForumSession('tok', ForumUser(id: 7, username: 'alice', displayName: 'Alice'));
+    await tester.pumpWidget(testApp(state, const Scaffold(body: ForumScreen())));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Questions').first);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(calls.last.url.queryParameters['kind'], 'question');
+    expect(find.text('Poser une question'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(testApp(state, const ComposeScreen(kind: 'question')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextField).at(0), 'leurre bar');
+    await tester.enterText(find.byType(TextField).at(1), 'quel leurre pour le bar');
+    await tester.tap(find.textContaining("Améliorer avec l'IA"));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Titre revu'), findsOneWidget);
+    expect(find.text('quel leurre pour le bar (revu)'), findsOneWidget);
+    await tester.tap(find.text('Revenir à mon texte'));
+    await tester.pump();
+    expect(find.text('leurre bar'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('logging in from the account page saves the session', (tester) async {
     phoneView(tester);
     final state = await testState();

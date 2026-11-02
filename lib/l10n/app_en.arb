@@ -321,5 +321,15 @@
   "noPhone": "No phone number",
   "wxMapError": "Weather data unavailable.",
   "wxNow": "Now",
-  "wxDataNote": "ECMWF, ICON, GFS and Météo-France models. Zoom in for more detail."
+  "wxDataNote": "ECMWF, ICON, GFS and Météo-France models. Zoom in for more detail.",
+  "forumArticles": "Articles",
+  "forumQuestions": "Questions",
+  "askQuestion": "Ask a question",
+  "questionBadge": "Question",
+  "kindArticle": "Article",
+  "kindQuestion": "Question",
+  "aiImprove": "Improve with AI",
+  "aiImproved": "Text improved by AI. Read it before publishing.",
+  "aiUndo": "Back to my text",
+  "aiUnavailable": "AI is not available right now."
 }
