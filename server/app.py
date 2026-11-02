@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 import forum
 import importer
 import osm_import
+import weather
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('SAYAD_DB', os.path.join(HERE, 'sayad.db'))
@@ -550,6 +551,7 @@ def osm_status():
 # --- Forum -------------------------------------------------------------------
 forum_router = forum.create_router(db, require_admin, lambda: MEDIA_DIR, lambda: OLD_APP_DIR)
 app.include_router(forum_router)
+app.include_router(weather.create_router())
 
 
 # --- Former review routes, kept for compatibility -----------------------------

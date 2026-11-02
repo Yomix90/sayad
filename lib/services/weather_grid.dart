@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
 
+import 'spots_api.dart';
+
 /// Layers of the weather map.
 enum WxLayer { wind, gusts, waves, rain, temp, pressure }
 
@@ -168,9 +170,28 @@ class WeatherGridService {
       // Land points stay empty instead of taking the nearest sea value.
       if (marine) 'cell_selection': 'nearest',
     });
-    final res = await _client.get(uri).timeout(const Duration(seconds: 30));
+    // The Sayad server shares one copy of each grid between all users and
+    // keeps it when Open-Meteo is down; Open-Meteo directly otherwise.
+    http.Response? res;
+    if (SpotsApi.base.isNotEmpty) {
+      try {
+        res = await _client
+            .get(Uri.parse('${SpotsApi.base}/weather/grid').replace(queryParameters: {
+              'latitude': uri.queryParameters['latitude']!,
+              'longitude': uri.queryParameters['longitude']!,
+              'hourly': uri.queryParameters['hourly']!,
+              'forecast_days': '3',
+            }))
+            .timeout(const Duration(seconds: 45));
+      } catch (_) {
+        res = null;
+      }
+    }
+    if (res == null || res.statusCode != 200) {
+      res = await _client.get(uri).timeout(const Duration(seconds: 30));
+    }
     if (res.statusCode != 200) throw Exception('Open-Meteo ${res.statusCode}');
-    final body = jsonDecode(res.body);
+    final body = jsonDecode(utf8.decode(res.bodyBytes));
     final points = body is List ? body : [body];
 
     List<double?> series(Map<String, dynamic> p, String name) =>

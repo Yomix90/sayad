@@ -152,6 +152,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
                   children: [
                     baseLayer('night'),
                     if (grid != null) _WxLayerWidget(grid: grid, hour: _hour, scale: scale, layer: _layer),
+                    ?labelsLayer('night'),
                     if (_probe != null)
                       MarkerLayer(markers: [
                         Marker(

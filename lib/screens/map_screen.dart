@@ -83,6 +83,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   children: [
                     baseLayer(state.mapLayer),
+                    ?labelsLayer(state.mapLayer),
                     TileLayer(
                       urlTemplate:
                           'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',

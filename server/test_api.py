@@ -328,6 +328,47 @@ def test_forum_import_old_articles():
                for f in client.get('/admin/api/import/files', headers=ADMIN).json()['files'])
 
 
+def test_weather_grid_cache():
+    import urllib.error
+    import weather
+    calls = []
+
+    def fake(url):
+        calls.append(url)
+        if len(calls) > 1:
+            raise urllib.error.URLError('overloaded')
+        return b'[{"hourly": {"time": ["2026-11-02T00:00"], "wind_speed_10m": [12]}}]'
+
+    weather.fetch, real = fake, weather.fetch
+    weather._cache.clear()
+    try:
+        q = {'latitude': '30,31', 'longitude': '-9,-9', 'hourly': 'wind_speed_10m,wind_direction_10m'}
+        r = client.get('/weather/grid', params=q)
+        assert r.status_code == 200 and r.headers['x-cache'] == 'miss'
+        assert 'api.open-meteo.com' in calls[0] and 'wind_speed_unit=kmh' in calls[0]
+        # Same grid for another user: from the cache.
+        assert client.get('/weather/grid', params=q).headers['x-cache'] == 'hit'
+        assert len(calls) == 1
+        # Open-Meteo down after an hour: the old grid is still served.
+        for k, (t, body) in list(weather._cache.items()):
+            weather._cache[k] = (t - 2 * 3600, body)
+        r = client.get('/weather/grid', params=q)
+        assert r.headers['x-cache'] == 'stale' and r.json()[0]['hourly']['wind_speed_10m'] == [12]
+        # A grid never fetched while Open-Meteo is down.
+        assert client.get('/weather/grid', params={**q, 'latitude': '20,21'}).status_code == 503
+        # Waves go to the marine API; bad input is refused.
+        weather._cache.clear()
+        calls.clear()
+        client.get('/weather/grid', params={**q, 'hourly': 'wave_height,wave_direction'})
+        assert 'marine-api' in calls[0] and 'cell_selection=nearest' in calls[0]
+        assert client.get('/weather/grid', params={**q, 'hourly': 'wave_height,temperature_2m'}).status_code == 422
+        assert client.get('/weather/grid', params={**q, 'hourly': 'secret'}).status_code == 422
+        assert client.get('/weather/grid', params={**q, 'latitude': ','.join(['1'] * 201),
+                                                   'longitude': ','.join(['1'] * 201)}).status_code == 422
+    finally:
+        weather.fetch = real
+
+
 def test_dashboard_javascript_is_valid():
     """A syntax error in the page's script silently breaks the login button."""
     import shutil

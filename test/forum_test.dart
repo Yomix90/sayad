@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:sayad/screens/forum_screen.dart';
 import 'package:sayad/screens/tools_screen.dart';
@@ -123,6 +124,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(state.forumUser?.displayName, 'Alice');
     expect(state.forumToken, 'tok');
+  });
+
+  test('weather grids come from the Sayad server, Open-Meteo when it fails', () async {
+    final paths = <String>[];
+    final mock = weatherMockServer();
+    WeatherGridService.testClient = MockClient((req) async {
+      paths.add('${req.url.host}${req.url.path}');
+      if (req.url.host == 'api.example') return http.Response('down', 503);
+      return mock.get(req.url);
+    });
+    final g = await WeatherGridService().load(WxLayer.wind, 30, -10, 31.5, -8.5);
+    expect(g.values, isNotEmpty);
+    expect(paths, ['api.example/weather/grid', 'api.open-meteo.com/v1/forecast']);
   });
 
   testWidgets('tools grid and weather map render', (tester) async {
