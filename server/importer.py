@@ -17,12 +17,35 @@ LON = ('lon', 'lng', 'long', 'longitude', 'longi', 'x')
 PHONE = ('phone', 'tel', 'telephone', 'mobile', 'gsm')
 INFO = ('inf', 'info', 'infos', 'description', 'desc', 'details', 'notes')
 ICON = ('icon', 'type', 'kind', 'category', 'categorie')
-IMAGE = ('imageurl', 'image', 'image_url', 'photo', 'img')
+IMAGE = ('imageurl', 'image', 'image_url', 'photo_url', 'photo', 'img')
 SHOP_HINTS = ('matajir', 'shop', 'magasin', 'store', 'متاجر')
 SUPPORTED = ('.db', '.sqlite', '.sqlite3', '.csv', '.json', '.geojson')
 
 # Moroccan phone numbers in free text: 06…, 07…, 05…, +212…
 PHONE_RE = re.compile(r'(?:\+212|00212|0)\s?[5-7](?:[\s.-]?\d){8}')
+# Any other number written alone on a line (other countries, landlines).
+OTHER_PHONE_RE = re.compile(r'^\s*(\+?\d[\d\s.-]{6,18}\d)\s*$')
+
+
+def extract_phone(text: str) -> str:
+    """First phone number of a shop's free text, without spaces."""
+    text = text or ''
+    m = PHONE_RE.search(text)
+    if m:
+        return re.sub(r'[\s.-]', '', m.group(0))
+    for part in re.split(r'//|\n', text):
+        m = OTHER_PHONE_RE.match(part)
+        if m:
+            digits = re.sub(r'[\s.-]', '', m.group(1))
+            if 8 <= len(digits.lstrip('+')) <= 13:
+                return digits
+    return ''
+
+
+def clean_info(text: str) -> str:
+    """The old app separates the lines of its texts with '//'."""
+    parts = [p.strip() for p in re.split(r'//', text or '')]
+    return '\n'.join(p for p in parts if p)
 
 
 def _pick(cols, names):
@@ -73,6 +96,8 @@ def _read_rows(path, table=None):
         with open(path, encoding='utf-8-sig', newline='') as f:
             return list(csv.DictReader(f))
     data = json.load(open(path, encoding='utf-8'))
+    if isinstance(data, dict) and table and isinstance(data.get(table), list):
+        return data[table]
     if isinstance(data, dict) and 'features' in data:
         rows = []
         for feat in data['features']:
@@ -80,6 +105,20 @@ def _read_rows(path, table=None):
             rows.append({**(feat.get('properties') or {}), 'lat': lat, 'lon': lon})
         return rows
     return data if isinstance(data, list) else []
+
+
+def _json_tables(path):
+    """Lists of places inside one JSON object, e.g. {"spots": [...], "magasins": [...]}."""
+    data = json.load(open(path, encoding='utf-8'))
+    if not isinstance(data, dict) or 'features' in data:
+        return []
+    out = []
+    for key, rows in data.items():
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+            cols = list(rows[0].keys())
+            if _pick(cols, LAT) and _pick(cols, LON):
+                out.append({'table': key, 'rows': len(rows), 'columns': cols})
+    return out
 
 
 def scan(directory):
@@ -97,6 +136,9 @@ def scan(directory):
             try:
                 if ext in ('.db', '.sqlite', '.sqlite3'):
                     for t in _sqlite_tables(path):
+                        found.append({'file': rel, **t, 'target': _guess_target(t['table'], name)})
+                elif ext == '.json' and _json_tables(path):
+                    for t in _json_tables(path):
                         found.append({'file': rel, **t, 'target': _guess_target(t['table'], name)})
                 else:
                     rows = _read_rows(path)
@@ -141,11 +183,10 @@ def import_file(db_path, path, table=None, into=None, status='approved',
         if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
             result['invalid'] += 1
             continue
-        info = text(r, 'info')
-        phone = text(r, 'phone')
+        info = clean_info(text(r, 'info'))
+        phone = re.sub(r'[\s.-]', '', text(r, 'phone'))
         if not phone and into == 'shops':
-            m = PHONE_RE.search(info)
-            phone = re.sub(r'[\s.-]', '', m.group(0)) if m else ''
+            phone = extract_phone(info)
         clean.append({'name': text(r, 'name') or ('Magasin' if into == 'shops' else 'Spot'),
                       'lat': lat, 'lon': lon, 'info': info[:500], 'phone': phone,
                       'icon': text(r, 'icon')[:30], 'image': text(r, 'image')[:300]})
@@ -171,9 +212,9 @@ def import_file(db_path, path, table=None, into=None, status='approved',
                     (s['name'], s['lat'], s['lon'], s['info'], s['icon'], s['image'], status, source, now))
             else:
                 con.execute(
-                    'INSERT INTO shops(name, lat, lon, phone, description, icon, gold, status, source, created_at) '
-                    'VALUES (?,?,?,?,?,?,?,?,?,?)',
-                    (s['name'], s['lat'], s['lon'], s['phone'], s['info'], s['icon'],
+                    'INSERT INTO shops(name, lat, lon, phone, description, icon, image_url, gold, status, source, created_at) '
+                    'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                    (s['name'], s['lat'], s['lon'], s['phone'], s['info'], s['icon'], s['image'],
                      1 if s['icon'] in ('shop3', 'gold') else 0, status, source, now))
             result['inserted'] += 1
         con.commit()

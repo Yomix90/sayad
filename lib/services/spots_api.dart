@@ -13,6 +13,8 @@ class ServerSpot {
     this.species = '',
     this.phone = '',
     this.gold = false,
+    this.description = '',
+    this.imageUrl = '',
   });
 
   final int id;
@@ -22,6 +24,8 @@ class ServerSpot {
   final String species;
   final String phone;
   final bool gold;
+  final String description;
+  final String imageUrl;
 
   factory ServerSpot.fromJson(Map<String, dynamic> j) => ServerSpot(
         id: (j['id'] as num).toInt(),
@@ -31,7 +35,26 @@ class ServerSpot {
         species: (j['species'] as String?) ?? '',
         phone: (j['phone'] as String?) ?? '',
         gold: (j['gold'] as num? ?? 0) != 0,
+        description: (j['description'] as String?) ?? '',
+        imageUrl: (j['image_url'] as String?) ?? '',
       );
+
+  /// Lines of the description, without the ones that only repeat the name
+  /// or the phone number.
+  List<String> get infoLines => [
+        for (final l in description.split(RegExp(r'\s*(?://|\n)\s*')))
+          if (l.isNotEmpty &&
+              l != name &&
+              l.replaceAll(RegExp(r'[\s.-]'), '') != phone)
+            l
+      ];
+
+  /// International number for WhatsApp (Moroccan mobiles only).
+  String? get whatsapp {
+    final d = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final m = RegExp(r'^(?:\+212|00212|0)([67]\d{8})$').firstMatch(d);
+    return m == null ? null : '212${m.group(1)}';
+  }
 }
 
 /// Client of the Sayad spots server (see server/). Disabled unless the app
@@ -47,10 +70,10 @@ class SpotsApi {
   @visibleForTesting
   static String? overrideBase;
 
-  static String get _base => overrideBase ?? baseUrl;
+  static String get base => overrideBase ?? baseUrl;
 
   Future<List<ServerSpot>> _list(String path, LatLng sw, LatLng ne) async {
-    final uri = Uri.parse('$_base$path').replace(queryParameters: {
+    final uri = Uri.parse('$base$path').replace(queryParameters: {
       'min_lat': '${sw.latitude}',
       'max_lat': '${ne.latitude}',
       'min_lon': '${sw.longitude}',
@@ -72,7 +95,7 @@ class SpotsApi {
   /// Proposes a tackle shop; it appears once the admin approves it.
   Future<void> submitShop(String name, LatLng at, {String phone = '', String city = ''}) async {
     final res = await _client
-        .post(Uri.parse('$_base/shops'),
+        .post(Uri.parse('$base/shops'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'name': name,
@@ -88,7 +111,7 @@ class SpotsApi {
   /// Proposes a spot to everyone; it appears once the admin approves it.
   Future<void> submitSpot(String name, LatLng at, {String kind = 'other'}) async {
     final res = await _client
-        .post(Uri.parse('$_base/spots'),
+        .post(Uri.parse('$base/spots'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'name': name,

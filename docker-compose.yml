@@ -12,6 +12,7 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in Dokploy environment}
       SAYAD_DB: /data/sayad.db
       OLD_APP_DIR: /data/old_app
+      MEDIA_DIR: /data/media
     volumes:
       - sayad-data:/data
     expose:

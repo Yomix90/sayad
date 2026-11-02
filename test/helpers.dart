@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -5,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:sayad/l10n/app_localizations.dart';
 import 'package:sayad/services/app_state.dart';
@@ -59,6 +62,10 @@ Forecast fakeForecast() {
 
 Future<AppState> testState({AppStyle style = AppStyle.modern}) async {
   DateFormat.useNativeDigitsByDefaultFor('ar', false);
+  // flutter_map caches tiles in the app's cache folder.
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (_) async => Directory.systemTemp.createTempSync('sayad_test').path);
   SharedPreferences.setMockInitialValues({'onboarded': true});
   final state = AppState();
   await state.load();
@@ -114,3 +121,71 @@ Future<void> loadAppFonts() async {
         .buffer)));
   await icons.load();
 }
+
+Map<String, dynamic> _article(int id, {bool full = false}) => {
+      'id': id,
+      'title': 'Belle courbine à Dakhla $id',
+      'category': id.isEven ? 'catches' : 'qa',
+      'excerpt': 'Une prise de 12 kg au lever du jour, avec un leurre souple…',
+      'author': id.isEven ? 'Alice' : 'لكديرة',
+      'user_id': id.isEven ? 7 : null,
+      'images': id.isEven ? ['/media/abc.jpg', 'https://x.example/b.jpg'] : <String>[],
+      'created_at': 1730000000 + id,
+      'source': id.isEven ? 'app' : 'tifnit',
+      'comments': 2,
+      'reactions': {'like': 3, 'fish': 1},
+      if (full) ...{
+        'body': 'Premier paragraphe.\nVidéo : https://www.youtube.com/watch?v=abcdefghijk',
+        'comment_list': [
+          {'id': 1, 'user_id': 7, 'author': 'Alice', 'body': 'Bravo !', 'created_at': 1730000100},
+          {'id': 2, 'user_id': 9, 'author': 'Bob', 'body': 'Où exactement ?', 'created_at': 1730000200},
+        ],
+        'my_reaction': 'like',
+      },
+    };
+
+http.Response _json(Object body, [int status = 200]) =>
+    http.Response.bytes(utf8.encode(jsonEncode(body)), status,
+        headers: {'content-type': 'application/json'});
+
+/// Fake forum server: two articles, one with photos and comments.
+MockClient forumMockServer([List<http.BaseRequest>? calls]) => MockClient((req) async {
+      calls?.add(req);
+      final path = req.url.path;
+      if (path == '/forum/articles' && req.method == 'GET') {
+        return _json({'total': 2, 'items': [_article(2), _article(3)]});
+      }
+      if (path.startsWith('/forum/articles/') && req.method == 'GET') {
+        return _json(_article(int.parse(path.split('/').last), full: true));
+      }
+      if (path.endsWith('/react')) return _json({'reactions': {'like': 2, 'fish': 2}, 'my_reaction': 'fish'});
+      if (path == '/auth/login') {
+        return _json({'token': 'tok', 'user': {'id': 7, 'username': 'alice', 'display_name': 'Alice'}});
+      }
+      return _json({'detail': 'Not found'}, 404);
+    });
+
+/// Fake Open-Meteo: wind over every requested point for 72 hours.
+MockClient weatherMockServer() => MockClient((req) async {
+      final lats = req.url.queryParameters['latitude']!.split(',');
+      final lons = req.url.queryParameters['longitude']!.split(',');
+      final times = [
+        for (var h = 0; h < 72; h++)
+          '2026-11-0${2 + h ~/ 24}T${(h % 24).toString().padLeft(2, '0')}:00'
+      ];
+      return _json([
+        for (var i = 0; i < lats.length; i++)
+          {
+            'hourly': {
+              'time': times,
+              'wind_speed_10m': [
+                for (var h = 0; h < 72; h++)
+                  12 + 30 * sin(double.parse(lats[i]) * 1.3 + h / 9) * cos(double.parse(lons[i]) * 0.9)
+              ],
+              'wind_direction_10m': [
+                for (var h = 0; h < 72; h++) (20 + 40 * double.parse(lons[i]) + h * 3) % 360
+              ],
+            }
+          }
+      ]);
+    });

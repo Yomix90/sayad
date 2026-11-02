@@ -52,7 +52,7 @@ void main() {
     final state = await testState();
     await tester.pumpWidget(testApp(state, const HomeShell()));
     await tester.pump(const Duration(seconds: 2));
-    for (final label in ['Marées', 'Prévisions', 'Outils', "Aujourd'hui"]) {
+    for (final label in ['Marées', 'Prévisions', 'Forum', 'Outils', "Aujourd'hui"]) {
       await tester.tap(find.text(label).last);
       await tester.pump(const Duration(seconds: 1));
       expect(tester.takeException(), isNull, reason: label);

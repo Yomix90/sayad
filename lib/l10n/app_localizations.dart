@@ -1683,6 +1683,354 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Nous contacter'**
   String get contactUs;
+
+  /// No description provided for @tabForum.
+  ///
+  /// In fr, this message translates to:
+  /// **'Forum'**
+  String get tabForum;
+
+  /// No description provided for @forumSub.
+  ///
+  /// In fr, this message translates to:
+  /// **'Articles, photos et conseils des pêcheurs'**
+  String get forumSub;
+
+  /// No description provided for @forumEmpty.
+  ///
+  /// In fr, this message translates to:
+  /// **'Aucun article pour l\'instant.'**
+  String get forumEmpty;
+
+  /// No description provided for @forumError.
+  ///
+  /// In fr, this message translates to:
+  /// **'Impossible de charger le forum.'**
+  String get forumError;
+
+  /// No description provided for @forumDisabled.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le forum n\'est pas disponible dans cette version.'**
+  String get forumDisabled;
+
+  /// No description provided for @writeArticle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Écrire'**
+  String get writeArticle;
+
+  /// No description provided for @newArticle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nouvel article'**
+  String get newArticle;
+
+  /// No description provided for @articleTitle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Titre'**
+  String get articleTitle;
+
+  /// No description provided for @articleBody.
+  ///
+  /// In fr, this message translates to:
+  /// **'Votre texte : spot, technique, prise, question…'**
+  String get articleBody;
+
+  /// No description provided for @category.
+  ///
+  /// In fr, this message translates to:
+  /// **'Catégorie'**
+  String get category;
+
+  /// No description provided for @addPhotos.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ajouter des photos'**
+  String get addPhotos;
+
+  /// No description provided for @photoLimit.
+  ///
+  /// In fr, this message translates to:
+  /// **'10 photos maximum'**
+  String get photoLimit;
+
+  /// No description provided for @publish.
+  ///
+  /// In fr, this message translates to:
+  /// **'Publier'**
+  String get publish;
+
+  /// No description provided for @published.
+  ///
+  /// In fr, this message translates to:
+  /// **'Article publié'**
+  String get published;
+
+  /// No description provided for @titleTooShort.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le titre doit faire au moins 3 caractères et le texte ne peut pas être vide.'**
+  String get titleTooShort;
+
+  /// No description provided for @comments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Commentaires'**
+  String get comments;
+
+  /// No description provided for @writeComment.
+  ///
+  /// In fr, this message translates to:
+  /// **'Écrire un commentaire…'**
+  String get writeComment;
+
+  /// No description provided for @noComments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pas encore de commentaire.'**
+  String get noComments;
+
+  /// No description provided for @loginToPost.
+  ///
+  /// In fr, this message translates to:
+  /// **'Connectez-vous pour publier, réagir et commenter.'**
+  String get loginToPost;
+
+  /// No description provided for @login.
+  ///
+  /// In fr, this message translates to:
+  /// **'Se connecter'**
+  String get login;
+
+  /// No description provided for @register.
+  ///
+  /// In fr, this message translates to:
+  /// **'Créer un compte'**
+  String get register;
+
+  /// No description provided for @logout.
+  ///
+  /// In fr, this message translates to:
+  /// **'Se déconnecter'**
+  String get logout;
+
+  /// No description provided for @username.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nom d\'utilisateur'**
+  String get username;
+
+  /// No description provided for @usernameHint.
+  ///
+  /// In fr, this message translates to:
+  /// **'3 à 30 caractères : lettres, chiffres, _ . -'**
+  String get usernameHint;
+
+  /// No description provided for @password.
+  ///
+  /// In fr, this message translates to:
+  /// **'Mot de passe'**
+  String get password;
+
+  /// No description provided for @passwordHint.
+  ///
+  /// In fr, this message translates to:
+  /// **'6 caractères minimum'**
+  String get passwordHint;
+
+  /// No description provided for @displayName.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nom affiché'**
+  String get displayName;
+
+  /// No description provided for @haveAccount.
+  ///
+  /// In fr, this message translates to:
+  /// **'J\'ai déjà un compte'**
+  String get haveAccount;
+
+  /// No description provided for @noAccount.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pas de compte ? Créez-en un'**
+  String get noAccount;
+
+  /// No description provided for @authFailed.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nom d\'utilisateur ou mot de passe incorrect.'**
+  String get authFailed;
+
+  /// No description provided for @usernameTaken.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ce nom d\'utilisateur est déjà pris.'**
+  String get usernameTaken;
+
+  /// No description provided for @accountSuspended.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ce compte est suspendu.'**
+  String get accountSuspended;
+
+  /// No description provided for @tooManyTries.
+  ///
+  /// In fr, this message translates to:
+  /// **'Trop de tentatives, réessayez plus tard.'**
+  String get tooManyTries;
+
+  /// No description provided for @invalidForm.
+  ///
+  /// In fr, this message translates to:
+  /// **'Vérifiez les champs du formulaire.'**
+  String get invalidForm;
+
+  /// No description provided for @serverUnreachable.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pas de connexion au serveur.'**
+  String get serverUnreachable;
+
+  /// No description provided for @loggedInAs.
+  ///
+  /// In fr, this message translates to:
+  /// **'Connecté : {name}'**
+  String loggedInAs(String name);
+
+  /// No description provided for @account.
+  ///
+  /// In fr, this message translates to:
+  /// **'Compte'**
+  String get account;
+
+  /// No description provided for @deleteArticleQ.
+  ///
+  /// In fr, this message translates to:
+  /// **'Supprimer cet article ?'**
+  String get deleteArticleQ;
+
+  /// No description provided for @searchForum.
+  ///
+  /// In fr, this message translates to:
+  /// **'Rechercher dans le forum'**
+  String get searchForum;
+
+  /// No description provided for @archive.
+  ///
+  /// In fr, this message translates to:
+  /// **'Archive'**
+  String get archive;
+
+  /// No description provided for @catGeneral.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pêche générale'**
+  String get catGeneral;
+
+  /// No description provided for @catSurfcasting.
+  ///
+  /// In fr, this message translates to:
+  /// **'Surfcasting'**
+  String get catSurfcasting;
+
+  /// No description provided for @catSpinning.
+  ///
+  /// In fr, this message translates to:
+  /// **'Spinning'**
+  String get catSpinning;
+
+  /// No description provided for @catPole.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pêche au coup'**
+  String get catPole;
+
+  /// No description provided for @catBoat.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pêche en bateau'**
+  String get catBoat;
+
+  /// No description provided for @catQa.
+  ///
+  /// In fr, this message translates to:
+  /// **'Questions'**
+  String get catQa;
+
+  /// No description provided for @catCatches.
+  ///
+  /// In fr, this message translates to:
+  /// **'Belles prises'**
+  String get catCatches;
+
+  /// No description provided for @catVideos.
+  ///
+  /// In fr, this message translates to:
+  /// **'Vidéos'**
+  String get catVideos;
+
+  /// No description provided for @mapLayers.
+  ///
+  /// In fr, this message translates to:
+  /// **'Fond de carte'**
+  String get mapLayers;
+
+  /// No description provided for @mapStandard.
+  ///
+  /// In fr, this message translates to:
+  /// **'Plan'**
+  String get mapStandard;
+
+  /// No description provided for @mapSatellite.
+  ///
+  /// In fr, this message translates to:
+  /// **'Satellite'**
+  String get mapSatellite;
+
+  /// No description provided for @mapNight.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nuit'**
+  String get mapNight;
+
+  /// No description provided for @call.
+  ///
+  /// In fr, this message translates to:
+  /// **'Appeler'**
+  String get call;
+
+  /// No description provided for @whatsapp.
+  ///
+  /// In fr, this message translates to:
+  /// **'WhatsApp'**
+  String get whatsapp;
+
+  /// No description provided for @noPhone.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pas de numéro de téléphone'**
+  String get noPhone;
+
+  /// No description provided for @wxMapError.
+  ///
+  /// In fr, this message translates to:
+  /// **'Données météo indisponibles.'**
+  String get wxMapError;
+
+  /// No description provided for @wxNow.
+  ///
+  /// In fr, this message translates to:
+  /// **'Maintenant'**
+  String get wxNow;
+
+  /// No description provided for @wxDataNote.
+  ///
+  /// In fr, this message translates to:
+  /// **'Modèles ECMWF, ICON, GFS, Météo-France. Zoomez pour plus de détails.'**
+  String get wxDataNote;
 }
 
 class _AppLocalizationsDelegate

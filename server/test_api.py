@@ -12,8 +12,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 from fastapi.testclient import TestClient  # noqa: E402
 
 import app as server  # noqa: E402
+import forum  # noqa: E402
 
 server.DB_PATH = os.environ['SAYAD_DB']
+server.MEDIA_DIR = os.path.join(TMP, 'media')
 server.ADMIN_TOKEN = 'secret-test'
 server.OLD_APP_DIR = os.environ['OLD_APP_DIR']
 server.init_db()
@@ -201,6 +203,129 @@ def test_import_log_and_upload_cleanup():
                        json={'file': 'uploads/../../x'}).status_code == 400
     assert client.post('/admin/api/import/delete', headers=ADMIN,
                        json={'file': 'uploads/used.csv'}).json() == {'deleted': ['uploads/used.csv']}
+
+
+def test_shop_phones_and_old_app_json():
+    import importer
+    assert importer.extract_phone('Hassan Peche//\nwww.x.com//\n0528 33 22 32//') == '0528332232'
+    assert importer.extract_phone('0912406462') == '0912406462'
+    assert importer.extract_phone('686845248045036//hasweb') == ''  # page id, not a phone
+    assert importer.extract_phone('Ouvert le matin') == ''
+    path = os.path.join(server.OLD_APP_DIR, 'tifnit_complet.json')
+    import json
+    json.dump({'metadata': {'total': 2},
+               'spots': [{'nom': 'Anza', 'latitude': 30.45, 'longitude': -9.66, 'photo_url': 'https://x/1.jpg'}],
+               'magasins': [{'nom': 'Hassan Peche', 'latitude': 30.35, 'longitude': -9.53,
+                             'description': 'Hassan Peche//\nwww.hassan-peche.com//\n0528332232//',
+                             'telephone': '0528332232', 'photo_url': 'https://x/s.jpg'}]},
+              open(path, 'w', encoding='utf-8'))
+    files = [f for f in client.get('/admin/api/import/files', headers=ADMIN).json()['files']
+             if f['file'] == 'tifnit_complet.json']
+    assert {(f['table'], f['target']) for f in files} == {('spots', 'spots'), ('magasins', 'shops')}
+    r = client.post('/admin/api/import', headers=ADMIN,
+                    json={'file': 'tifnit_complet.json', 'table': 'magasins'}).json()
+    assert r['inserted'] == 1 and r['into'] == 'shops'
+    shop = [s for s in client.get('/shops', params={'min_lat': 30.3, 'max_lat': 30.4}).json()
+            if s['name'] == 'Hassan Peche'][0]
+    assert shop['phone'] == '0528332232' and shop['image_url'] == 'https://x/s.jpg'
+    assert shop['description'] == 'Hassan Peche\nwww.hassan-peche.com\n0528332232'
+
+
+OLD_ARTICLES = [
+    {'id': 80, 'titre': 'Le leurre et la lumière', 'categorie': 'الاسئلة - Questions & Réponses',
+     'images': ['https://www.tifnit.com/a.jpg'],
+     'texte': 'Premier paragraphe.\nDeuxième ligne.\n31-12-2017\nلكديرة',
+     'content_html': '<iframe src="https://www.youtube.com/embed/abcdefghijk"></iframe>'},
+    {'id': 81, 'titre': 'Surfcasting à Agadir', 'categorie': 'القصبة الرامية - Surfcasting',
+     'images': [], 'texte': 'Texte sans date', 'content_html': ''},
+]
+
+
+def _user(name='pecheur1'):
+    forum.register_limit.clear()
+    r = client.post('/auth/register', json={'username': name, 'password': 'secret123',
+                                            'display_name': name.title()})
+    assert r.status_code == 201, r.text
+    return {'Authorization': 'Bearer ' + r.json()['token']}
+
+
+def test_forum_accounts_articles_reactions_comments():
+    alice = _user('alice')
+    # Same name twice, wrong password, missing token.
+    assert client.post('/auth/register', json={'username': 'ALICE', 'password': 'secret123'}).status_code == 409
+    assert client.post('/auth/login', json={'username': 'alice', 'password': 'nope'}).status_code == 401
+    assert client.post('/auth/login', json={'username': 'alice', 'password': 'secret123'}).status_code == 200
+    assert client.get('/auth/me', headers=alice).json()['display_name'] == 'Alice'
+    assert client.post('/forum/articles', json={'title': 'Hello', 'body': 'x'}).status_code == 401
+
+    # Image upload: only real images.
+    png = b'\x89PNG\r\n\x1a\n' + b'0' * 50
+    up = client.post('/forum/images', headers=alice, files={'file': ('a.png', png, 'image/png')})
+    assert up.status_code == 201
+    url = up.json()['url']
+    assert client.get(url).content == png
+    bad = client.post('/forum/images', headers=alice, files={'file': ('a.png', b'<html>', 'image/png')})
+    assert bad.status_code == 400
+
+    r = client.post('/forum/articles', headers=alice, json={
+        'title': 'Belle prise à Dakhla', 'body': 'Une courbine de 12 kg.', 'category': 'catches',
+        'images': [url, 'https://evil.example/x.jpg']})
+    assert r.status_code == 201
+    art = r.json()
+    assert art['images'] == [url] and art['author'] == 'Alice'
+
+    bob = _user('bob')
+    assert client.post(f"/forum/articles/{art['id']}/react", headers=bob, json={'type': 'fish'}).json() == \
+        {'reactions': {'fish': 1}, 'my_reaction': 'fish'}
+    client.post(f"/forum/articles/{art['id']}/react", headers=alice, json={'type': 'like'})
+    # The same reaction again removes it.
+    assert client.post(f"/forum/articles/{art['id']}/react", headers=bob, json={'type': 'fish'}).json()[
+        'reactions'] == {'like': 1}
+    comments = client.post(f"/forum/articles/{art['id']}/comments", headers=bob, json={'body': 'Bravo !'}).json()
+    assert [c['author'] for c in comments] == ['Bob']
+
+    items = client.get('/forum/articles', params={'category': 'catches'}).json()['items']
+    assert items[0]['comments'] == 1 and items[0]['reactions'] == {'like': 1}
+    full = client.get(f"/forum/articles/{art['id']}", headers=alice).json()
+    assert full['my_reaction'] == 'like' and full['body'] == 'Une courbine de 12 kg.'
+
+    # Only the author deletes the article; a banned user cannot post.
+    assert client.delete(f"/forum/articles/{art['id']}", headers=bob).status_code == 404
+    assert client.put(f"/admin/api/forum/users/{full['user_id']}", headers=ADMIN,
+                      json={'banned': True}).status_code == 200
+    assert client.post('/forum/articles', headers=alice, json={'title': 'Encore', 'body': 'x'}).status_code == 401
+    users = client.get('/admin/api/forum/users', headers=ADMIN).json()
+    assert {u['username']: u['banned'] for u in users}['alice'] == 1
+
+    # Admin hides it: not public any more.
+    client.put(f"/admin/api/forum/articles/{art['id']}", headers=ADMIN, json={'status': 'hidden'})
+    assert client.get(f"/forum/articles/{art['id']}").status_code == 404
+
+
+def test_forum_import_old_articles():
+    import json
+    a = forum.parse_old_article(OLD_ARTICLES[0])
+    assert a['author'] == 'لكديرة' and a['category'] == 'qa'
+    assert a['body'] == 'Premier paragraphe.\nDeuxième ligne.\n\nhttps://www.youtube.com/watch?v=abcdefghijk'
+    assert a['created_at'] == 1514721600 and a['ext_id'] == 'tifnit:80'
+
+    up = os.path.join(server.OLD_APP_DIR, 'uploads')
+    os.makedirs(up, exist_ok=True)
+    data = json.dumps(OLD_ARTICLES).encode()
+    r = client.post('/admin/api/import/upload', headers=ADMIN,
+                    files={'file': ('encyclopedie.json', data, 'application/json')}).json()
+    # Imported as soon as it is sent; images are copied in the background.
+    assert r['forum'][0]['inserted'] == 2
+    assert client.get('/admin/api/forum/import', headers=ADMIN).json()['files'] == [
+        {'file': 'uploads/encyclopedie.json', 'imported': 2}]
+    again = client.post('/admin/api/forum/import', headers=ADMIN,
+                        json={'file': 'uploads/encyclopedie.json', 'copy_images': False}).json()
+    assert again['inserted'] == 0 and again['duplicates'] == 2
+    titles = [x['title'] for x in client.get('/forum/articles', params={'q': 'Surfcasting'}).json()['items']]
+    assert titles == ['Surfcasting à Agadir']
+    # Not offered as a spots file.
+    assert all(f['file'] != 'uploads/encyclopedie.json'
+               for f in client.get('/admin/api/import/files', headers=ADMIN).json()['files'])
 
 
 def test_dashboard_javascript_is_valid():

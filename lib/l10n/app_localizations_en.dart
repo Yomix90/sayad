@@ -854,4 +854,182 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contactUs => 'Contact us';
+
+  @override
+  String get tabForum => 'Forum';
+
+  @override
+  String get forumSub => 'Posts, photos and tips from anglers';
+
+  @override
+  String get forumEmpty => 'No posts yet.';
+
+  @override
+  String get forumError => 'Could not load the forum.';
+
+  @override
+  String get forumDisabled => 'The forum is not available in this build.';
+
+  @override
+  String get writeArticle => 'Write';
+
+  @override
+  String get newArticle => 'New post';
+
+  @override
+  String get articleTitle => 'Title';
+
+  @override
+  String get articleBody => 'Your text: spot, technique, catch, question…';
+
+  @override
+  String get category => 'Category';
+
+  @override
+  String get addPhotos => 'Add photos';
+
+  @override
+  String get photoLimit => '10 photos at most';
+
+  @override
+  String get publish => 'Publish';
+
+  @override
+  String get published => 'Post published';
+
+  @override
+  String get titleTooShort =>
+      'The title needs at least 3 characters and the text cannot be empty.';
+
+  @override
+  String get comments => 'Comments';
+
+  @override
+  String get writeComment => 'Write a comment…';
+
+  @override
+  String get noComments => 'No comments yet.';
+
+  @override
+  String get loginToPost => 'Log in to post, react and comment.';
+
+  @override
+  String get login => 'Log in';
+
+  @override
+  String get register => 'Create an account';
+
+  @override
+  String get logout => 'Log out';
+
+  @override
+  String get username => 'Username';
+
+  @override
+  String get usernameHint => '3 to 30 characters: letters, digits, _ . -';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get passwordHint => 'At least 6 characters';
+
+  @override
+  String get displayName => 'Display name';
+
+  @override
+  String get haveAccount => 'I already have an account';
+
+  @override
+  String get noAccount => 'No account? Create one';
+
+  @override
+  String get authFailed => 'Wrong username or password.';
+
+  @override
+  String get usernameTaken => 'This username is already taken.';
+
+  @override
+  String get accountSuspended => 'This account is suspended.';
+
+  @override
+  String get tooManyTries => 'Too many attempts, try again later.';
+
+  @override
+  String get invalidForm => 'Check the form fields.';
+
+  @override
+  String get serverUnreachable => 'Cannot reach the server.';
+
+  @override
+  String loggedInAs(String name) {
+    return 'Logged in: $name';
+  }
+
+  @override
+  String get account => 'Account';
+
+  @override
+  String get deleteArticleQ => 'Delete this post?';
+
+  @override
+  String get searchForum => 'Search the forum';
+
+  @override
+  String get archive => 'Archive';
+
+  @override
+  String get catGeneral => 'General fishing';
+
+  @override
+  String get catSurfcasting => 'Surfcasting';
+
+  @override
+  String get catSpinning => 'Spinning';
+
+  @override
+  String get catPole => 'Pole fishing';
+
+  @override
+  String get catBoat => 'Boat fishing';
+
+  @override
+  String get catQa => 'Questions';
+
+  @override
+  String get catCatches => 'Catches';
+
+  @override
+  String get catVideos => 'Videos';
+
+  @override
+  String get mapLayers => 'Base map';
+
+  @override
+  String get mapStandard => 'Map';
+
+  @override
+  String get mapSatellite => 'Satellite';
+
+  @override
+  String get mapNight => 'Night';
+
+  @override
+  String get call => 'Call';
+
+  @override
+  String get whatsapp => 'WhatsApp';
+
+  @override
+  String get noPhone => 'No phone number';
+
+  @override
+  String get wxMapError => 'Weather data unavailable.';
+
+  @override
+  String get wxNow => 'Now';
+
+  @override
+  String get wxDataNote =>
+      'ECMWF, ICON, GFS and Météo-France models. Zoom in for more detail.';
 }

@@ -8,12 +8,12 @@ Environment:
   ADMIN_TOKEN   password of the dashboard (required for /admin)
   SAYAD_DB      SQLite file (default: ./sayad.db)
   OLD_APP_DIR   folder scanned for files to import (default: ../old app)
+  MEDIA_DIR     images of the forum (default: ./media)
 """
 import csv
 import hmac
 import io
 import os
-import re
 import sqlite3
 import time
 from collections import defaultdict, deque
@@ -25,6 +25,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
+import forum
 import importer
 import osm_import
 
@@ -33,6 +34,7 @@ DB_PATH = os.environ.get('SAYAD_DB', os.path.join(HERE, 'sayad.db'))
 # Tolerate quotes or spaces copied into the Dokploy environment.
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '').strip().strip('"\'').strip()
 OLD_APP_DIR = os.environ.get('OLD_APP_DIR', os.path.join(HERE, '..', 'old app'))
+MEDIA_DIR = os.environ.get('MEDIA_DIR', os.path.join(HERE, 'media'))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS spots (
@@ -79,7 +81,8 @@ CREATE TABLE IF NOT EXISTS import_log (
 MIGRATIONS = {
     'spots': {'icon': "TEXT NOT NULL DEFAULT ''", 'image_url': "TEXT NOT NULL DEFAULT ''",
               'ext_id': "TEXT NOT NULL DEFAULT ''"},
-    'shops': {'description': "TEXT NOT NULL DEFAULT ''", 'icon': "TEXT NOT NULL DEFAULT ''"},
+    'shops': {'description': "TEXT NOT NULL DEFAULT ''", 'icon': "TEXT NOT NULL DEFAULT ''",
+              'image_url': "TEXT NOT NULL DEFAULT ''"},
 }
 
 Kind = Literal['rock', 'beach', 'port', 'jetty', 'lake', 'river', 'dam', 'boat', 'other']
@@ -92,12 +95,18 @@ def init_db(path: Optional[str] = None) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with sqlite3.connect(path) as c:
         c.executescript(SCHEMA)
+        c.executescript(forum.SCHEMA)
         for table, cols in MIGRATIONS.items():
             have = {r[1] for r in c.execute(f'PRAGMA table_info({table})')}
             for col, decl in cols.items():
                 if col not in have:
                     c.execute(f'ALTER TABLE {table} ADD COLUMN {col} {decl}')
         c.execute('CREATE INDEX IF NOT EXISTS spots_ext ON spots(ext_id)')
+        # Shops imported before phones were read from every number format.
+        for sid, desc in c.execute("SELECT id, description FROM shops WHERE phone = '' AND description != ''").fetchall():
+            phone = importer.extract_phone(desc)
+            if phone:
+                c.execute('UPDATE shops SET phone = ? WHERE id = ?', (phone, sid))
 
 
 @contextmanager
@@ -118,6 +127,10 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 @app.on_event('startup')
 def _startup() -> None:
     init_db()
+    try:
+        forum_router.auto_import()
+    except Exception as e:  # never block the start of the API
+        print('Forum auto-import failed:', e)
 
 
 # --- Simple per-IP limit on public submissions (5 per hour) ----------------
@@ -207,7 +220,7 @@ def submit_spot(s: SpotIn):
 def list_shops(min_lat: float = Query(-90), max_lat: float = Query(90),
                min_lon: float = Query(-180), max_lon: float = Query(180),
                limit: int = Query(2000, le=10000)):
-    return _bbox_query('shops', 'id, name, lat, lon, phone, city, gold',
+    return _bbox_query('shops', 'id, name, lat, lon, phone, city, gold, description, image_url',
                        min_lat, max_lat, min_lon, max_lon, limit)
 
 
@@ -350,18 +363,17 @@ def convert(table: Table, body: Convert):
         for r in rows:
             r = dict(r)
             if target == 'shops':
-                m = importer.PHONE_RE.search(r.get('description') or '')
-                phone = re.sub(r'[\s.-]', '', m.group(0)) if m else ''
-                c.execute('INSERT INTO shops(name, lat, lon, phone, description, icon, status, source, created_at) '
-                          'VALUES (?,?,?,?,?,?,?,?,?)',
+                phone = importer.extract_phone(r.get('description') or '')
+                c.execute('INSERT INTO shops(name, lat, lon, phone, description, icon, image_url, status, source, created_at) '
+                          'VALUES (?,?,?,?,?,?,?,?,?,?)',
                           (r['name'], r['lat'], r['lon'], phone, r.get('description') or '',
-                           r.get('icon') or '', r['status'], r['source'], r['created_at']))
+                           r.get('icon') or '', r.get('image_url') or '', r['status'], r['source'], r['created_at']))
             else:
                 desc = ' · '.join(x for x in (r.get('phone'), r.get('city'), r.get('description')) if x)
-                c.execute('INSERT INTO spots(name, lat, lon, kind, description, icon, status, source, created_at) '
-                          "VALUES (?,?,?, 'other', ?,?,?,?,?)",
+                c.execute('INSERT INTO spots(name, lat, lon, kind, description, icon, image_url, status, source, created_at) '
+                          "VALUES (?,?,?, 'other', ?,?,?,?,?,?)",
                           (r['name'], r['lat'], r['lon'], desc[:500], r.get('icon') or '',
-                           r['status'], r['source'], r['created_at']))
+                           r.get('image_url') or '', r['status'], r['source'], r['created_at']))
             c.execute(f'DELETE FROM {table} WHERE id = ?', (r['id'],))
     return {'converted': len(rows), 'into': target}
 
@@ -478,7 +490,11 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(413, 'File too large (50 MB max)')
     with open(os.path.join(folder, name), 'wb') as f:
         f.write(data)
-    return {'saved': f'uploads/{name}'}
+    out = {'saved': f'uploads/{name}'}
+    # Articles of the old app are imported into the forum right away.
+    if forum.is_articles_file(os.path.join(folder, name)):
+        out['forum'] = forum_router.auto_import()
+    return out
 
 
 def _uploaded_files():
@@ -529,6 +545,11 @@ def osm_start(req: OsmReq):
 @app.get('/admin/api/import/osm', dependencies=admin)
 def osm_status():
     return osm_import.status()
+
+
+# --- Forum -------------------------------------------------------------------
+forum_router = forum.create_router(db, require_admin, lambda: MEDIA_DIR, lambda: OLD_APP_DIR)
+app.include_router(forum_router)
 
 
 # --- Former review routes, kept for compatibility -----------------------------

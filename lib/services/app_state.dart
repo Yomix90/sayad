@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/regions.dart';
+import 'forum_api.dart';
 import '../theme.dart';
 
 class Spot {
@@ -106,6 +107,14 @@ class AppState extends ChangeNotifier {
   List<Spot> spots = [];
   List<Catch> catches = [];
 
+  /// Base map of the map tab: standard, satellite or night.
+  String mapLayer = 'standard';
+
+  /// Forum account of this phone (null when logged out).
+  String? forumToken;
+  ForumUser? forumUser;
+  ForumApi get forum => ForumApi(token: forumToken);
+
   late SharedPreferences _prefs;
 
   Future<void> load() async {
@@ -117,6 +126,14 @@ class AppState extends ChangeNotifier {
     regionId = _prefs.getString('region') ?? regionId;
     hijriOffset = _prefs.getInt('hijriOffset') ?? hijriOffset;
     position = region.position;
+    mapLayer = _prefs.getString('mapLayer') ?? mapLayer;
+    forumToken = _prefs.getString('forumToken');
+    final rawUser = _prefs.getString('forumUser');
+    if (forumToken != null && rawUser != null) {
+      forumUser = ForumUser.fromJson(jsonDecode(rawUser) as Map<String, dynamic>);
+    } else {
+      forumToken = null;
+    }
     final raw = _prefs.getString('spots');
     if (raw != null) {
       spots = (jsonDecode(raw) as List)
@@ -180,6 +197,29 @@ class AppState extends ChangeNotifier {
   void useRegion() {
     usingGps = false;
     position = region.position;
+    notifyListeners();
+  }
+
+  Future<void> setMapLayer(String value) async {
+    mapLayer = value;
+    await _prefs.setString('mapLayer', value);
+    notifyListeners();
+  }
+
+  Future<void> setForumSession(String token, ForumUser user) async {
+    forumToken = token;
+    forumUser = user;
+    await _prefs.setString('forumToken', token);
+    await _prefs.setString('forumUser', jsonEncode(user.toJson()));
+    notifyListeners();
+  }
+
+  Future<void> logoutForum() async {
+    await forum.logout();
+    forumToken = null;
+    forumUser = null;
+    await _prefs.remove('forumToken');
+    await _prefs.remove('forumUser');
     notifyListeners();
   }
 

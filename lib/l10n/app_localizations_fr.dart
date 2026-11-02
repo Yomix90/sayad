@@ -861,4 +861,183 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get contactUs => 'Nous contacter';
+
+  @override
+  String get tabForum => 'Forum';
+
+  @override
+  String get forumSub => 'Articles, photos et conseils des pêcheurs';
+
+  @override
+  String get forumEmpty => 'Aucun article pour l\'instant.';
+
+  @override
+  String get forumError => 'Impossible de charger le forum.';
+
+  @override
+  String get forumDisabled =>
+      'Le forum n\'est pas disponible dans cette version.';
+
+  @override
+  String get writeArticle => 'Écrire';
+
+  @override
+  String get newArticle => 'Nouvel article';
+
+  @override
+  String get articleTitle => 'Titre';
+
+  @override
+  String get articleBody => 'Votre texte : spot, technique, prise, question…';
+
+  @override
+  String get category => 'Catégorie';
+
+  @override
+  String get addPhotos => 'Ajouter des photos';
+
+  @override
+  String get photoLimit => '10 photos maximum';
+
+  @override
+  String get publish => 'Publier';
+
+  @override
+  String get published => 'Article publié';
+
+  @override
+  String get titleTooShort =>
+      'Le titre doit faire au moins 3 caractères et le texte ne peut pas être vide.';
+
+  @override
+  String get comments => 'Commentaires';
+
+  @override
+  String get writeComment => 'Écrire un commentaire…';
+
+  @override
+  String get noComments => 'Pas encore de commentaire.';
+
+  @override
+  String get loginToPost => 'Connectez-vous pour publier, réagir et commenter.';
+
+  @override
+  String get login => 'Se connecter';
+
+  @override
+  String get register => 'Créer un compte';
+
+  @override
+  String get logout => 'Se déconnecter';
+
+  @override
+  String get username => 'Nom d\'utilisateur';
+
+  @override
+  String get usernameHint => '3 à 30 caractères : lettres, chiffres, _ . -';
+
+  @override
+  String get password => 'Mot de passe';
+
+  @override
+  String get passwordHint => '6 caractères minimum';
+
+  @override
+  String get displayName => 'Nom affiché';
+
+  @override
+  String get haveAccount => 'J\'ai déjà un compte';
+
+  @override
+  String get noAccount => 'Pas de compte ? Créez-en un';
+
+  @override
+  String get authFailed => 'Nom d\'utilisateur ou mot de passe incorrect.';
+
+  @override
+  String get usernameTaken => 'Ce nom d\'utilisateur est déjà pris.';
+
+  @override
+  String get accountSuspended => 'Ce compte est suspendu.';
+
+  @override
+  String get tooManyTries => 'Trop de tentatives, réessayez plus tard.';
+
+  @override
+  String get invalidForm => 'Vérifiez les champs du formulaire.';
+
+  @override
+  String get serverUnreachable => 'Pas de connexion au serveur.';
+
+  @override
+  String loggedInAs(String name) {
+    return 'Connecté : $name';
+  }
+
+  @override
+  String get account => 'Compte';
+
+  @override
+  String get deleteArticleQ => 'Supprimer cet article ?';
+
+  @override
+  String get searchForum => 'Rechercher dans le forum';
+
+  @override
+  String get archive => 'Archive';
+
+  @override
+  String get catGeneral => 'Pêche générale';
+
+  @override
+  String get catSurfcasting => 'Surfcasting';
+
+  @override
+  String get catSpinning => 'Spinning';
+
+  @override
+  String get catPole => 'Pêche au coup';
+
+  @override
+  String get catBoat => 'Pêche en bateau';
+
+  @override
+  String get catQa => 'Questions';
+
+  @override
+  String get catCatches => 'Belles prises';
+
+  @override
+  String get catVideos => 'Vidéos';
+
+  @override
+  String get mapLayers => 'Fond de carte';
+
+  @override
+  String get mapStandard => 'Plan';
+
+  @override
+  String get mapSatellite => 'Satellite';
+
+  @override
+  String get mapNight => 'Nuit';
+
+  @override
+  String get call => 'Appeler';
+
+  @override
+  String get whatsapp => 'WhatsApp';
+
+  @override
+  String get noPhone => 'Pas de numéro de téléphone';
+
+  @override
+  String get wxMapError => 'Données météo indisponibles.';
+
+  @override
+  String get wxNow => 'Maintenant';
+
+  @override
+  String get wxDataNote =>
+      'Modèles ECMWF, ICON, GFS, Météo-France. Zoomez pour plus de détails.';
 }

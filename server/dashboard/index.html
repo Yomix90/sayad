@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sayad · Gestion des spots</title>
+<title>Sayad · Administration</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -62,6 +62,8 @@
   .toast.show { opacity: 1; }
   pre { background: #0A2540; color: #EAF6FB; padding: 12px; border-radius: 10px; overflow: auto; font-size: 12px; }
   [dir=auto] { unicode-bidi: plaintext; }
+  .thumb { width: 54px; height: 40px; object-fit: cover; border-radius: 8px; background: var(--surface2); }
+  .excerpt { color: var(--muted); font-size: 13px; max-width: 460px; }
 </style>
 </head>
 <body>
@@ -76,7 +78,7 @@
 
 <div id="app" class="hidden">
   <header>
-    <div><h1>SAYAD</h1><small>Gestion des spots et magasins</small></div>
+    <div><h1>SAYAD</h1><small>Spots, magasins et forum</small></div>
     <div class="sp"></div>
     <button id="logout">Déconnexion</button>
   </header>
@@ -88,6 +90,7 @@
       <button data-tab="shops">Magasins</button>
       <button data-tab="map">Carte</button>
       <button data-tab="import">Import</button>
+      <button data-tab="forum">Forum</button>
     </nav>
 
     <section id="list">
@@ -162,6 +165,40 @@
       <h3>Résultat</h3>
       <pre id="importOut">—</pre>
     </section>
+
+    <section id="forumTab" class="hidden">
+      <div class="cards" id="forumCards"></div>
+      <div class="card" style="margin-bottom:12px">
+        <b>Anciens articles</b>
+        <p class="muted">Les fichiers d'articles de l'ancienne application (par ex. <code>encyclopedie_tifnit.json</code>) sont importés automatiquement dès qu'ils sont envoyés dans l'onglet Import. Les images sont ensuite copiées sur ce serveur.</p>
+        <div class="bar" id="forumFiles"></div>
+        <span id="forumImages" class="muted"></span>
+      </div>
+      <nav id="forumNav">
+        <button data-fview="articles" class="on">Articles</button>
+        <button data-fview="users">Utilisateurs</button>
+      </nav>
+      <div id="fArticles">
+        <div class="bar">
+          <select id="fSource"><option value="">Toutes les sources</option><option value="app">Application</option><option value="tifnit">Ancienne app</option></select>
+          <select id="fStatus"><option value="">Tous</option><option value="published">Publiés</option><option value="hidden">Masqués</option></select>
+          <input type="search" id="fq" placeholder="Titre, texte ou auteur…">
+          <span id="fPage" class="muted"></span>
+          <button id="fPrev">←</button><button id="fNext">→</button>
+        </div>
+        <table>
+          <thead><tr><th></th><th>Article</th><th>Auteur</th><th>Date</th><th>Réactions</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="fRows"></tbody>
+        </table>
+      </div>
+      <div id="fUsers" class="hidden">
+        <div class="bar"><input type="search" id="uq" placeholder="Nom d'utilisateur…"></div>
+        <table>
+          <thead><tr><th>#</th><th>Utilisateur</th><th>Inscrit le</th><th>Articles</th><th>Commentaires</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="uRows"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -193,6 +230,12 @@
       <button class="primary" value="save" id="saveBtn">Enregistrer</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="comments">
+  <h3 id="cTitle">Commentaires</h3>
+  <div id="cList"></div>
+  <div class="bar" style="margin-top:16px;justify-content:flex-end"><button onclick="$('#comments').close()">Fermer</button></div>
 </dialog>
 
 <div class="toast" id="toast"></div>
@@ -414,6 +457,7 @@ function showTab(tab) {
   $('#list').classList.toggle('hidden', !['pending', 'spots', 'shops'].includes(tab));
   $('#mapTab').classList.toggle('hidden', tab !== 'map');
   $('#importTab').classList.toggle('hidden', tab !== 'import');
+  $('#forumTab').classList.toggle('hidden', tab !== 'forum');
   if (tab === 'pending') { state.status = 'pending'; }
   if (tab === 'spots' || tab === 'shops') { state.table = tab; state.status = ''; }
   $('#table').value = state.table; $('#status').value = state.status; state.offset = 0;
@@ -425,6 +469,7 @@ async function refresh() {
     await loadStats();
     if (state.tab === 'map') await loadMap();
     else if (state.tab === 'import') await loadFiles();
+    else if (state.tab === 'forum') await loadForum();
     else await loadList();
   } catch (e) { toast(e.message); }
 }
@@ -490,9 +535,120 @@ $('#osmBtn').onclick = async () => {
 $('#uploadBtn').onclick = async () => {
   const f = $('#upload').files[0]; if (!f) return toast('Choisissez un fichier');
   const fd = new FormData(); fd.append('file', f);
-  try { const r = await api('/admin/api/import/upload', { method: 'POST', body: fd }); toast('Envoyé : ' + r.saved); loadFiles(); }
+  try {
+    const r = await api('/admin/api/import/upload', { method: 'POST', body: fd });
+    const arts = (r.forum || []).reduce((n, x) => n + x.inserted, 0);
+    toast(r.forum ? `${arts} article(s) ajouté(s) au forum` : 'Envoyé : ' + r.saved); loadFiles();
+  }
   catch (e) { toast('Erreur : ' + e.message); }
 };
+// --- Forum ---
+const forum = { view: 'articles', q: '', source: '', status: '', offset: 0, limit: 50, items: [] };
+const reactIcons = { like: '👍', love: '❤️', fish: '🐟', wow: '😮' };
+const day = t => new Date(t * 1000).toLocaleDateString('fr-FR');
+let imgTimer;
+function showImages(st) {
+  $('#forumImages').textContent = st.running
+    ? `Copie des images : ${st.done}/${st.total}${st.failed ? ' · ' + st.failed + ' introuvables' : ''}`
+    : st.total ? `Images copiées : ${st.done - st.failed}/${st.total}${st.failed ? ' (' + st.failed + ' introuvables, liens gardés)' : ''}` : '';
+  clearTimeout(imgTimer);
+  if (st.running) imgTimer = setTimeout(async () => showImages((await api('/admin/api/forum/import')).images), 4000);
+}
+async function loadForum() {
+  const imp = await api('/admin/api/forum/import');
+  $('#forumFiles').innerHTML = imp.files.map((f, i) => `<span class="card" style="padding:8px 12px">
+    <code>${esc(f.file)}</code> · ${f.imported != null ? `<span class="pill approved">importé (${f.imported})</span>` : '<span class="pill pending">pas encore importé</span>'}
+    <button data-fimp="${i}" style="margin-inline-start:6px">Importer</button></span>`).join('') ||
+    '<span class="muted">Aucun fichier d\'articles. Envoyez encyclopedie_tifnit.json dans l\'onglet Import.</span>';
+  $('#forumFiles').onclick = async e => {
+    const b = e.target.closest('[data-fimp]'); if (!b) return;
+    const f = imp.files[+b.dataset.fimp];
+    try {
+      const r = await api('/admin/api/forum/import', { method: 'POST', body: JSON.stringify({ file: f.file }) });
+      toast(`${r.inserted} article(s) importé(s) · ${r.duplicates} déjà présents`); loadForum();
+    } catch (err) { toast('Erreur : ' + err.message); }
+  };
+  showImages(imp.images);
+  if (forum.view === 'users') return loadUsers();
+  const p = new URLSearchParams({ q: forum.q, source: forum.source, status: forum.status, offset: forum.offset, limit: forum.limit });
+  const r = await api('/admin/api/forum/articles?' + p);
+  forum.items = r.items;
+  const card = (v, l) => `<div class="card"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  $('#forumCards').innerHTML = card(r.stats.articles, 'Articles') + card(r.stats.comments, 'Commentaires') + card(r.stats.users, 'Utilisateurs');
+  $('#fPage').textContent = r.total ? `${forum.offset + 1}–${Math.min(forum.offset + forum.limit, r.total)} sur ${r.total}` : 'Aucun article';
+  $('#fRows').innerHTML = r.items.map(a => `<tr data-id="${a.id}">
+      <td>${a.images[0] ? `<img class="thumb" loading="lazy" src="${esc(a.images[0])}" alt="">` : ''}</td>
+      <td><b dir="auto">${esc(a.title)}</b><div class="excerpt" dir="auto">${esc(a.excerpt)}</div>
+        <span class="muted" style="font-size:12px">${esc(a.category)} · ${a.images.length} image(s) · ${a.source === 'tifnit' ? 'ancienne app' : 'application'}</span></td>
+      <td dir="auto">${esc(a.author)}</td>
+      <td class="n">${day(a.created_at)}</td>
+      <td class="n">${Object.entries(a.reactions).map(([k, v]) => reactIcons[k] + ' ' + v).join(' ') || '—'}<br>💬 ${a.comments}</td>
+      <td><span class="pill ${a.status === 'published' ? 'approved' : 'rejected'}">${a.status === 'published' ? 'Publié' : 'Masqué'}</span></td>
+      <td class="actions">
+        <button data-fact="comments">💬</button>
+        <button data-fact="toggle">${a.status === 'published' ? 'Masquer' : 'Publier'}</button>
+        <button class="danger" data-fact="delete">🗑</button>
+      </td></tr>`).join('');
+}
+async function loadUsers() {
+  const users = await api('/admin/api/forum/users?q=' + encodeURIComponent($('#uq').value));
+  $('#uRows').innerHTML = users.map(u => `<tr data-id="${u.id}">
+      <td class="n">${u.id}</td><td><b dir="auto">${esc(u.display_name)}</b> <span class="muted">@${esc(u.username)}</span></td>
+      <td class="n">${day(u.created_at)}</td><td class="n">${u.articles}</td><td class="n">${u.comments}</td>
+      <td><span class="pill ${u.banned ? 'rejected' : 'approved'}">${u.banned ? 'Suspendu' : 'Actif'}</span></td>
+      <td class="actions"><button data-ban="${u.banned ? 0 : 1}">${u.banned ? 'Réactiver' : 'Suspendre'}</button></td></tr>`).join('') ||
+    '<tr><td colspan="7" class="muted">Aucun utilisateur.</td></tr>';
+}
+$('#forumNav').onclick = e => {
+  const v = e.target.dataset.fview; if (!v) return;
+  forum.view = v;
+  $$('#forumNav button').forEach(b => b.classList.toggle('on', b.dataset.fview === v));
+  $('#fArticles').classList.toggle('hidden', v !== 'articles');
+  $('#fUsers').classList.toggle('hidden', v !== 'users');
+  loadForum();
+};
+$('#fRows').onclick = async e => {
+  const b = e.target.closest('[data-fact]'); if (!b) return;
+  const id = +b.closest('tr').dataset.id, a = forum.items.find(x => x.id === id);
+  try {
+    if (b.dataset.fact === 'comments') return openComments(a);
+    if (b.dataset.fact === 'toggle') {
+      await api(`/admin/api/forum/articles/${id}`, { method: 'PUT', body: JSON.stringify({ status: a.status === 'published' ? 'hidden' : 'published' }) });
+    } else {
+      if (!confirm(`Supprimer l'article « ${a.title} » et ses commentaires ?`)) return;
+      await api(`/admin/api/forum/articles/${id}`, { method: 'DELETE' });
+    }
+    loadForum();
+  } catch (err) { toast('Erreur : ' + err.message); }
+};
+async function openComments(a) {
+  $('#cTitle').textContent = a.title;
+  const list = await api(`/admin/api/forum/articles/${a.id}/comments`);
+  $('#cList').innerHTML = list.map(c => `<div class="card" style="margin:8px 0;padding:10px 12px" data-id="${c.id}">
+      <b dir="auto">${esc(c.author)}</b> <span class="muted">${day(c.created_at)}</span>
+      <button class="danger" data-cdel style="float:inline-end;padding:3px 8px">🗑</button>
+      <div dir="auto" style="white-space:pre-wrap;margin-top:4px">${esc(c.body)}</div></div>`).join('') || '<p class="muted">Aucun commentaire.</p>';
+  $('#cList').onclick = async e => {
+    if (!e.target.closest('[data-cdel]')) return;
+    const id = +e.target.closest('[data-id]').dataset.id;
+    try { await api(`/admin/api/forum/comments/${id}`, { method: 'DELETE' }); openComments(a); loadForum(); }
+    catch (err) { toast('Erreur : ' + err.message); }
+  };
+  if (!$('#comments').open) $('#comments').showModal();
+}
+$('#uRows').onclick = async e => {
+  const b = e.target.closest('[data-ban]'); if (!b) return;
+  const id = +b.closest('tr').dataset.id;
+  try { await api(`/admin/api/forum/users/${id}`, { method: 'PUT', body: JSON.stringify({ banned: b.dataset.ban === '1' }) }); loadUsers(); }
+  catch (err) { toast('Erreur : ' + err.message); }
+};
+let fqTimer; $('#fq').oninput = e => { clearTimeout(fqTimer); fqTimer = setTimeout(() => { forum.q = e.target.value; forum.offset = 0; loadForum(); }, 300); };
+let uqTimer; $('#uq').oninput = () => { clearTimeout(uqTimer); uqTimer = setTimeout(loadUsers, 300); };
+$('#fSource').onchange = e => { forum.source = e.target.value; forum.offset = 0; loadForum(); };
+$('#fStatus').onchange = e => { forum.status = e.target.value; forum.offset = 0; loadForum(); };
+$('#fPrev').onclick = () => { forum.offset = Math.max(0, forum.offset - forum.limit); loadForum(); };
+$('#fNext').onclick = () => { forum.offset += forum.limit; loadForum(); };
+
 if (token) login();
 </script>
 </body>

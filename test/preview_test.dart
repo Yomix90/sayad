@@ -8,9 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sayad/data/knots.dart';
 import 'package:sayad/main.dart';
+import 'package:sayad/screens/forum_screen.dart';
 import 'package:sayad/screens/guides_screens.dart';
 import 'package:sayad/screens/onboarding_screen.dart';
 import 'package:sayad/screens/splash_screen.dart';
+import 'package:sayad/screens/weather_map_screen.dart';
+import 'package:sayad/services/forum_api.dart';
+import 'package:sayad/services/spots_api.dart';
+import 'package:sayad/services/weather_grid.dart';
 import 'package:sayad/theme.dart';
 
 import 'helpers.dart';
@@ -23,13 +28,53 @@ void main() {
     ('today', 0, () => const HomeShell()),
     ('tides', 1, () => const HomeShell()),
     ('forecast', 3, () => const HomeShell()),
-    ('tools', 4, () => const HomeShell()),
+    ('tools', 5, () => const HomeShell()),
     ('guide', -1, () => const GuideScreen()),
     ('knot', -1, () => GuideDetailScreen(item: guide.first)),
     ('welcome', -1, () => const OnboardingScreen()),
   ];
-  const tabLabels = ["Aujourd'hui", 'Marées', 'Carte', 'Prévisions', 'Outils'];
-  const tabLabelsAr = ['اليوم', 'المد والجزر', 'الخريطة', 'التوقعات', 'الأدوات'];
+  const tabLabels = ["Aujourd'hui", 'Marées', 'Carte', 'Prévisions', 'Forum', 'Outils'];
+  const tabLabelsAr = ['اليوم', 'المد والجزر', 'الخريطة', 'التوقعات', 'المنتدى', 'الأدوات'];
+
+  for (final (style, lang) in [(AppStyle.modern, 'fr'), (AppStyle.classic, 'ar')]) {
+    testWidgets('preview forum ${style.name} $lang', (tester) async {
+      phoneView(tester);
+      debugDisableShadows = false;
+      SpotsApi.overrideBase = 'https://api.example';
+      ForumApi.testClient = forumMockServer();
+      final state = await testState(style: style);
+      await tester.pumpWidget(testApp(state, const Scaffold(body: ForumScreen()), lang: lang));
+      await tester.pump(const Duration(seconds: 1));
+      await expectLater(find.byType(MaterialApp),
+          matchesGoldenFile('previews/forum_${style.name}_$lang.png'));
+      await tester.tap(find.text('Belle courbine à Dakhla 2'));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+      await expectLater(find.byType(MaterialApp),
+          matchesGoldenFile('previews/article_${style.name}_$lang.png'));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(testApp(state, const AccountScreen(), lang: lang));
+      await tester.tap(find.text(lang == 'ar' ? 'ليس لديك حساب؟ أنشئ واحدًا' : 'Pas de compte ? Créez-en un'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(find.byType(MaterialApp),
+          matchesGoldenFile('previews/account_${style.name}_$lang.png'));
+      SpotsApi.overrideBase = null;
+      ForumApi.testClient = null;
+      debugDisableShadows = true;
+    });
+
+    testWidgets('preview weather map ${style.name} $lang', (tester) async {
+      phoneView(tester);
+      WeatherGridService.testClient = weatherMockServer();
+      final state = await testState(style: style);
+      await tester.pumpWidget(testApp(state, const WeatherMapScreen(), lang: lang));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      await expectLater(find.byType(MaterialApp),
+          matchesGoldenFile('previews/wxmap_${style.name}_$lang.png'));
+      WeatherGridService.testClient = null;
+    });
+  }
 
   for (final (lang, ms) in [('fr', 600), ('fr', 1800), ('ar', 3000)]) {
     testWidgets('preview splash $lang $ms', (tester) async {

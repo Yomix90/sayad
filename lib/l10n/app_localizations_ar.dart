@@ -851,4 +851,182 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get contactUs => 'تواصل معنا';
+
+  @override
+  String get tabForum => 'المنتدى';
+
+  @override
+  String get forumSub => 'مقالات وصور ونصائح الصيادين';
+
+  @override
+  String get forumEmpty => 'لا توجد مقالات بعد.';
+
+  @override
+  String get forumError => 'تعذر تحميل المنتدى.';
+
+  @override
+  String get forumDisabled => 'المنتدى غير متاح في هذه النسخة.';
+
+  @override
+  String get writeArticle => 'اكتب';
+
+  @override
+  String get newArticle => 'مقال جديد';
+
+  @override
+  String get articleTitle => 'العنوان';
+
+  @override
+  String get articleBody => 'نصك: مكان، تقنية، صيد، سؤال…';
+
+  @override
+  String get category => 'الفئة';
+
+  @override
+  String get addPhotos => 'إضافة صور';
+
+  @override
+  String get photoLimit => '10 صور كحد أقصى';
+
+  @override
+  String get publish => 'نشر';
+
+  @override
+  String get published => 'تم نشر المقال';
+
+  @override
+  String get titleTooShort =>
+      'يجب أن يتكون العنوان من 3 أحرف على الأقل وألا يكون النص فارغًا.';
+
+  @override
+  String get comments => 'التعليقات';
+
+  @override
+  String get writeComment => 'اكتب تعليقًا…';
+
+  @override
+  String get noComments => 'لا توجد تعليقات بعد.';
+
+  @override
+  String get loginToPost => 'سجّل الدخول للنشر والتفاعل والتعليق.';
+
+  @override
+  String get login => 'تسجيل الدخول';
+
+  @override
+  String get register => 'إنشاء حساب';
+
+  @override
+  String get logout => 'تسجيل الخروج';
+
+  @override
+  String get username => 'اسم المستخدم';
+
+  @override
+  String get usernameHint => 'من 3 إلى 30 حرفًا: حروف لاتينية وأرقام و _ . -';
+
+  @override
+  String get password => 'كلمة المرور';
+
+  @override
+  String get passwordHint => '6 أحرف على الأقل';
+
+  @override
+  String get displayName => 'الاسم الظاهر';
+
+  @override
+  String get haveAccount => 'لدي حساب بالفعل';
+
+  @override
+  String get noAccount => 'ليس لديك حساب؟ أنشئ واحدًا';
+
+  @override
+  String get authFailed => 'اسم المستخدم أو كلمة المرور غير صحيحة.';
+
+  @override
+  String get usernameTaken => 'اسم المستخدم هذا مستعمل.';
+
+  @override
+  String get accountSuspended => 'هذا الحساب موقوف.';
+
+  @override
+  String get tooManyTries => 'محاولات كثيرة، أعد المحاولة لاحقًا.';
+
+  @override
+  String get invalidForm => 'تحقق من حقول الاستمارة.';
+
+  @override
+  String get serverUnreachable => 'تعذر الاتصال بالخادم.';
+
+  @override
+  String loggedInAs(String name) {
+    return 'متصل: $name';
+  }
+
+  @override
+  String get account => 'الحساب';
+
+  @override
+  String get deleteArticleQ => 'حذف هذا المقال؟';
+
+  @override
+  String get searchForum => 'ابحث في المنتدى';
+
+  @override
+  String get archive => 'أرشيف';
+
+  @override
+  String get catGeneral => 'الصيد عامة';
+
+  @override
+  String get catSurfcasting => 'القصبة الرامية';
+
+  @override
+  String get catSpinning => 'الصيد بالجر';
+
+  @override
+  String get catPole => 'القصبة الثابتة';
+
+  @override
+  String get catBoat => 'الصيد بالقارب';
+
+  @override
+  String get catQa => 'أسئلة وأجوبة';
+
+  @override
+  String get catCatches => 'صيد اليوم';
+
+  @override
+  String get catVideos => 'فيديوهات';
+
+  @override
+  String get mapLayers => 'نوع الخريطة';
+
+  @override
+  String get mapStandard => 'خريطة';
+
+  @override
+  String get mapSatellite => 'قمر صناعي';
+
+  @override
+  String get mapNight => 'ليلي';
+
+  @override
+  String get call => 'اتصال';
+
+  @override
+  String get whatsapp => 'واتساب';
+
+  @override
+  String get noPhone => 'لا يوجد رقم هاتف';
+
+  @override
+  String get wxMapError => 'بيانات الطقس غير متوفرة.';
+
+  @override
+  String get wxNow => 'الآن';
+
+  @override
+  String get wxDataNote =>
+      'نماذج ECMWF وICON وGFS وMétéo-France. قرّب الخريطة لمزيد من التفاصيل.';
 }

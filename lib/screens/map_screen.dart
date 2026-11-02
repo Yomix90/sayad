@@ -8,6 +8,7 @@ import '../services/app_state.dart';
 import '../services/places_service.dart';
 import '../services/spots_api.dart';
 import '../theme.dart';
+import '../widgets/base_map.dart';
 import '../widgets/common.dart';
 import '../widgets/line_icons.dart';
 import '../widgets/sub_page.dart';
@@ -81,10 +82,7 @@ class _MapScreenState extends State<MapScreen> {
                         _openSheet(point, title: t.selectedPoint, kind: t.pointKind),
                   ),
                   children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.sayad.sayad',
-                    ),
+                    baseLayer(state.mapLayer),
                     TileLayer(
                       urlTemplate:
                           'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
@@ -98,15 +96,13 @@ class _MapScreenState extends State<MapScreen> {
                                   title: s.name,
                                   kind: s.species.isEmpty
                                       ? t.communitySpot
-                                      : '${t.communitySpot} · ${s.species}')),
+                                      : '${t.communitySpot} · ${s.species}',
+                                  place: s)),
                       if (showPlaces)
                         for (final s in _serverShops)
                           _pin(s.position, s.gold ? const Color(0xFFD4A017) : p.warn, 'store',
                               () => _openSheet(s.position,
-                                  title: s.name,
-                                  kind: s.phone.isEmpty
-                                      ? t.fishingShop
-                                      : '${t.fishingShop} · ${s.phone}')),
+                                  title: s.name, kind: t.fishingShop, place: s)),
                       if (showPlaces)
                         for (final pl in _places)
                           _pin(pl.position, _placeColor(p, pl.type),
@@ -126,9 +122,9 @@ class _MapScreenState extends State<MapScreen> {
                         child: _MeMarker(color: p.danger),
                       ),
                     ]),
-                    const RichAttributionWidget(attributions: [
-                      TextSourceAttribution('OpenStreetMap contributors'),
-                      TextSourceAttribution('OpenSeaMap'),
+                    RichAttributionWidget(attributions: [
+                      ...baseAttributions(state.mapLayer),
+                      const TextSourceAttribution('OpenSeaMap'),
                     ]),
                   ],
                 ),
@@ -144,29 +140,14 @@ class _MapScreenState extends State<MapScreen> {
               PositionedDirectional(
                 end: 12,
                 bottom: 12,
-                child: Material(
-                  color: p.surface,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: BorderSide(color: p.border),
-                  ),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () async {
-                      await state.locate();
-                      _controller.move(state.position, 12);
-                    },
-                    child: SizedBox(
-                      width: 46,
-                      height: 46,
-                      child: Center(
-                        child: LineIcon('cross',
-                            size: 21, color: p.classic ? p.primary : p.accentInk),
-                      ),
-                    ),
-                  ),
-                ),
+                child: Column(children: [
+                  _mapButton('layers', t.mapLayers, _chooseLayer),
+                  const SizedBox(height: 10),
+                  _mapButton('cross', t.myPosition, () async {
+                    await state.locate();
+                    _controller.move(state.position, 12);
+                  }),
+                ]),
               ),
             ]),
           ),
@@ -190,6 +171,94 @@ class _MapScreenState extends State<MapScreen> {
           ]),
         ),
       ]),
+    );
+  }
+
+  Widget _mapButton(String icon, String tooltip, VoidCallback onTap) {
+    final p = Palette.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: p.surface,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: p.border),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: SizedBox(
+            width: 46,
+            height: 46,
+            child: Center(
+              child: LineIcon(icon, size: 21, color: p.classic ? p.primary : p.accentInk),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _chooseLayer() {
+    final t = AppLocalizations.of(context);
+    final state = AppScope.of(context);
+    final p = Palette.of(context);
+    final layers = [
+      ('standard', t.mapStandard, const [Color(0xFFE8EEF2), Color(0xFFB9D7C3)]),
+      ('satellite', t.mapSatellite, const [Color(0xFF1C3B2E), Color(0xFF2E6A8A)]),
+      ('night', t.mapNight, const [Color(0xFF0B1320), Color(0xFF26324A)]),
+    ];
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t.mapLayers, style: p.title(18)),
+            const SizedBox(height: 14),
+            Row(children: [
+              for (final (id, label, colors) in layers)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      state.setMapLayer(id);
+                      Navigator.pop(c);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: Column(children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 74,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(p.radiusS),
+                            gradient: LinearGradient(
+                                colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                            border: Border.all(
+                                color: state.mapLayer == id ? p.accent : p.border,
+                                width: state.mapLayer == id ? 3 : 1),
+                          ),
+                          child: Center(
+                            child: LineIcon(
+                                id == 'night' ? 'moon' : id == 'satellite' ? 'globe' : 'map',
+                                size: 28,
+                                color: id == 'standard' ? const Color(0xFF0A2540) : Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(label,
+                            style: TextStyle(
+                                fontWeight: state.mapLayer == id ? FontWeight.w800 : FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+                ),
+            ]),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -244,7 +313,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openSheet(LatLng point,
-      {required String title, required String kind, Spot? spot}) {
+      {required String title, required String kind, Spot? spot, ServerSpot? place}) {
     final t = AppLocalizations.of(context);
     final state = AppScope.of(context);
     final p = Palette.of(context);
@@ -255,7 +324,7 @@ class _MapScreenState extends State<MapScreen> {
       showDragHandle: true,
       isScrollControlled: true,
       builder: (c) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
           child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -268,6 +337,7 @@ class _MapScreenState extends State<MapScreen> {
                   if (spot != null)
                     StatusChip(label: t.saved, tone: ChipTone.ok, icon: 'check'),
                 ]),
+                if (place != null) ..._placeDetails(place, isShop: kind == t.fishingShop),
                 const SizedBox(height: 13),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -373,6 +443,66 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
+  }
+
+  /// Photo, information lines and contact buttons of a server spot or shop.
+  List<Widget> _placeDetails(ServerSpot s, {required bool isShop}) {
+    final t = AppLocalizations.of(context);
+    final p = Palette.of(context);
+    final lines = s.infoLines;
+    final ink = p.classic ? const Color(0xFFF3E9D2) : const Color(0xFF04222B);
+    return [
+      if (s.imageUrl.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(p.radiusS),
+            child: SizedBox(
+              height: 150,
+              width: double.infinity,
+              child: Image.network(s.imageUrl,
+                  fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+            ),
+          ),
+        ),
+      if (lines.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final l in lines.take(6))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(l, style: TextStyle(color: p.text, fontSize: 14, height: 1.35)),
+              ),
+          ]),
+        ),
+      if (isShop)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: s.phone.isEmpty
+              ? StatusChip(label: t.noPhone, icon: 'phone')
+              : Row(children: [
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: p.ok),
+                      onPressed: () => launchUrl(Uri(scheme: 'tel', path: s.phone)),
+                      child: IconLabel(
+                          icon: LineIcon('phone', size: 19, color: ink),
+                          label: '${t.call} · \u2066${s.phone}\u2069'),
+                    ),
+                  ),
+                  if (s.whatsapp != null) ...[
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: () => launchUrl(Uri.parse('https://wa.me/${s.whatsapp}'),
+                          mode: LaunchMode.externalApplication),
+                      child: IconLabel(
+                          icon: LineIcon('chat', size: 19, color: p.text), label: t.whatsapp),
+                    ),
+                  ],
+                ]),
+        ),
+    ];
   }
 
   Widget _kv(String k, String v, {bool small = false}) {
