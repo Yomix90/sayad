@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Weather + marine forecast for one point, from the Open-Meteo APIs.
 class Forecast {
@@ -169,19 +170,46 @@ class ForecastService {
     });
 
     final results = await Future.wait([
-      http.get(weatherUri),
+      http.get(weatherUri).timeout(_timeout).catchError((_) => http.Response('{}', 599)),
       // Inland points have no marine data: treat a failure as "no sea".
-      http.get(marineUri).catchError((_) => http.Response('{}', 400)),
+      http.get(marineUri).timeout(_timeout).catchError((_) => http.Response('{}', 400)),
       // The averaged wind is a bonus: fall back to the default model.
-      http.get(windUri).catchError((_) => http.Response('{}', 400)),
+      http.get(windUri).timeout(_timeout).catchError((_) => http.Response('{}', 400)),
     ]);
-    if (results[0].statusCode != 200) {
-      throw Exception('Weather API error ${results[0].statusCode}');
+    final storeKey = 'forecast:${lat.toStringAsFixed(1)},${lon.toStringAsFixed(1)}';
+    Map<String, dynamic>? w;
+    if (results[0].statusCode == 200) {
+      w = jsonDecode(results[0].body) as Map<String, dynamic>;
+    } else {
+      // Open-Meteo down or overloaded: same data from MET Norway.
+      try {
+        final met = await http
+            .get(Uri.https('api.met.no', '/weatherapi/locationforecast/2.0/complete', {
+              'lat': lat.toStringAsFixed(4),
+              'lon': lon.toStringAsFixed(4),
+            }), headers: {'User-Agent': 'Sayad/1.0 (+https://github.com/Yomix90/sayad)'})
+            .timeout(_timeout);
+        if (met.statusCode == 200) {
+          w = metNoToOpenMeteo(jsonDecode(met.body) as Map<String, dynamic>);
+        }
+      } catch (_) {
+        // Offline: the last saved forecast below.
+      }
     }
-    final w = jsonDecode(results[0].body) as Map<String, dynamic>;
-    final m = results[1].statusCode == 200
+    var m = results[1].statusCode == 200
         ? jsonDecode(results[1].body) as Map<String, dynamic>
         : <String, dynamic>{};
+    final prefs = await _prefs();
+    if (w != null) {
+      // Keep the last good forecast for when no service answers.
+      prefs?.setString(storeKey, jsonEncode({'w': w, if (m.isNotEmpty) 'm': m}));
+    } else {
+      final saved = prefs?.getString(storeKey);
+      if (saved == null) throw Exception('Weather API error ${results[0].statusCode}');
+      final j = jsonDecode(saved) as Map<String, dynamic>;
+      w = j['w'] as Map<String, dynamic>;
+      if (m.isEmpty) m = (j['m'] as Map<String, dynamic>?) ?? m;
+    }
 
     final wc = w['current'] as Map<String, dynamic>;
     final wh = w['hourly'] as Map<String, dynamic>;
@@ -243,6 +271,16 @@ class ForecastService {
 
   static double? _d(Object? v) => (v as num?)?.toDouble();
 
+  static const _timeout = Duration(seconds: 20);
+
+  static Future<SharedPreferences?> _prefs() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Wind (speed, direction, gusts) at [t], interpolated between hours.
   static (double, double, double)? _windAt(List<HourPoint> hourly, DateTime t) {
     for (var i = 0; i < hourly.length - 1; i++) {
@@ -292,6 +330,125 @@ Map<String, (double, double, double?)> averageWind(Map<String, dynamic> json) {
     );
   }
   return out;
+}
+
+/// Turns a MET Norway locationforecast reply into the shape of an Open-Meteo
+/// reply ('current' + hourly series with local times), filling its 6-hourly
+/// tail hour by hour. MET has no gusts for Morocco: they are estimated.
+Map<String, dynamic> metNoToOpenMeteo(Map<String, dynamic> json) {
+  final series = [
+    for (final e in (json['properties'] as Map<String, dynamic>)['timeseries'] as List)
+      e as Map<String, dynamic>
+  ];
+  if (series.isEmpty) throw const FormatException('Empty MET Norway forecast');
+
+  Map<String, dynamic> details(Map<String, dynamic> e) =>
+      (e['data']['instant']['details'] as Map).cast<String, dynamic>();
+  String? symbol(Map<String, dynamic> e) {
+    final d = e['data'] as Map<String, dynamic>;
+    for (final k in ['next_1_hours', 'next_6_hours', 'next_12_hours']) {
+      final s = (d[k] as Map?)?['summary']?['symbol_code'] as String?;
+      if (s != null) return s;
+    }
+    return null;
+  }
+
+  // Values of one entry, in Open-Meteo units (km/h, hPa, °C, %).
+  Map<String, double> values(Map<String, dynamic> e) {
+    final d = details(e);
+    double v(String k, double fallback) => (d[k] as num?)?.toDouble() ?? fallback;
+    final speed = v('wind_speed', 0) * 3.6;
+    final dir = v('wind_from_direction', 0) * pi / 180;
+    return {
+      'temperature_2m': v('air_temperature', 0),
+      'relative_humidity_2m': v('relative_humidity', 0),
+      'pressure_msl': v('air_pressure_at_sea_level', 1013),
+      'gust': (d['wind_speed_of_gust'] as num?)?.toDouble() == null
+          ? speed * 1.45
+          : (d['wind_speed_of_gust'] as num).toDouble() * 3.6,
+      // Wind as a vector, so directions interpolate across north.
+      'u': speed * sin(dir),
+      'v': speed * cos(dir),
+    };
+  }
+
+  final points = [
+    for (final e in series) (DateTime.parse(e['time'] as String), values(e), symbol(e))
+  ];
+  String local(DateTime t) {
+    final l = t.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${l.year}-${two(l.month)}-${two(l.day)}T${two(l.hour)}:00';
+  }
+
+  final out = <String, List<Object?>>{
+    for (final k in [
+      'time', 'temperature_2m', 'relative_humidity_2m', 'wind_speed_10m', 'wind_direction_10m',
+      'wind_gusts_10m', 'pressure_msl', 'weather_code', 'is_day'
+    ])
+      k: <Object?>[]
+  };
+  var sym = points.first.$3 ?? 'cloudy';
+  for (var i = 0; i < points.length; i++) {
+    final (t, a, s) = points[i];
+    if (s != null) sym = s;
+    final next = i + 1 < points.length ? points[i + 1] : null;
+    final steps = next == null ? 1 : next.$1.difference(t).inHours.clamp(1, 12);
+    for (var h = 0; h < steps; h++) {
+      final f = h / steps;
+      double at(String k) => next == null ? a[k]! : a[k]! + (next.$2[k]! - a[k]!) * f;
+      final u = at('u'), v = at('v');
+      final time = t.add(Duration(hours: h));
+      final hour = time.toLocal().hour;
+      out['time']!.add(local(time));
+      out['temperature_2m']!.add(at('temperature_2m'));
+      out['relative_humidity_2m']!.add(at('relative_humidity_2m'));
+      out['pressure_msl']!.add(at('pressure_msl'));
+      out['wind_speed_10m']!.add(sqrt(u * u + v * v));
+      out['wind_direction_10m']!.add((atan2(u, v) * 180 / pi + 360) % 360);
+      out['wind_gusts_10m']!.add(at('gust'));
+      out['weather_code']!.add(_wmoCode(sym));
+      out['is_day']!.add(sym.endsWith('_night')
+          ? 0
+          : sym.endsWith('_day')
+              ? 1
+              : (hour >= 7 && hour < 19 ? 1 : 0));
+    }
+  }
+  final now = values(series.first);
+  return {
+    'current': {
+      'temperature_2m': now['temperature_2m'],
+      'relative_humidity_2m': now['relative_humidity_2m'],
+      'pressure_msl': now['pressure_msl'],
+      'wind_speed_10m': (out['wind_speed_10m']!.first as double),
+      'wind_direction_10m': (out['wind_direction_10m']!.first as double),
+      'wind_gusts_10m': now['gust'],
+      'weather_code': _wmoCode(points.first.$3 ?? 'cloudy'),
+    },
+    'hourly': out,
+  };
+}
+
+/// WMO weather code (as used by Open-Meteo) for a MET Norway symbol.
+int _wmoCode(String symbol) {
+  final s = symbol.split('_').first;
+  if (s.contains('thunder')) return 95;
+  if (s.contains('snow')) return s.contains('heavy') ? 75 : 71;
+  if (s.contains('sleet')) return 66;
+  if (s.contains('rain')) {
+    final showers = s.contains('showers');
+    if (s.startsWith('heavy')) return showers ? 82 : 65;
+    if (s.startsWith('light')) return showers ? 80 : 61;
+    return showers ? 81 : 63;
+  }
+  return switch (s) {
+    'clearsky' => 0,
+    'fair' => 1,
+    'partlycloudy' => 2,
+    'fog' => 45,
+    _ => 3,
+  };
 }
 
 /// High and low tides found as local extremes of the modelled sea level.
