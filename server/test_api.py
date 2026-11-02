@@ -421,7 +421,7 @@ def test_gemini_rewrite_and_claude_fallback():
     import ai
     sent = []
 
-    def fake_call(path, payload=None):
+    def fake_call(path, payload=None, **_):
         sent.append((path, payload))
         if path.startswith('models?'):
             return {'models': [
@@ -448,8 +448,17 @@ def test_gemini_rewrite_and_claude_fallback():
         assert payload['generationConfig']['responseMimeType'] == 'application/json'
         assert payload['contents'][0]['parts'][0]['text'].startswith('Question')
 
+        # Newest model overloaded: the next Flash model answers.
+        def overloaded(path, payload=None, **_):
+            if path.startswith('models/gemini-3.6'):
+                raise urllib.error.HTTPError('u', 503, 'high demand', {}, None)
+            return fake_call(path, payload)
+        ai._gemini_call = overloaded
+        assert ai.improve('t', 'b')['title'] == 'Le bar en hiver'
+        assert sent[-1][0] == 'models/gemini-2.5-flash:generateContent'
+
         # Gemini over its free quota: Claude takes over when its key is set.
-        def busy(path, payload=None):
+        def busy(path, payload=None, **_):
             raise urllib.error.HTTPError('u', 429, 'quota', {}, None)
         ai._gemini_call = busy
         try:

@@ -7,6 +7,7 @@ Without any key the AI buttons answer 503 and everything else works.
 """
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -21,7 +22,7 @@ SYSTEM = """Tu es le rédacteur en chef du forum de Sayad, l'application des pê
 Ce que tu reçois : le type (Article ou Question), un titre (parfois vide ou maladroit) et le texte.
 
 Règles absolues :
-1. Langue : écris dans la langue du texte d'origine. Arabe standard reste en arabe standard ; darija reste en darija (orthographe corrigée, ton conservé) ; français reste en français ; anglais reste en anglais. Si le texte mélange les langues, garde la langue principale et laisse les termes techniques usuels tels quels (ex. « surfcasting », « bas de ligne », « القصبة »). Ne traduis jamais tout le texte.
+1. Langue : écris dans la langue du texte d'origine. Arabe standard reste en arabe standard ; darija reste en darija, avec le ton de l'auteur (en lettres latines, garde l'écriture courante des Marocains sur téléphone : 3, 7, 9, ch, kh, ou ; jamais de lettres savantes comme ṭ, ḥ, ṣ, ā, ni de tirets comme « eṣ-ṣayd ») ; français reste en français ; anglais reste en anglais. Si le texte mélange les langues, garde la langue principale et laisse les termes techniques usuels tels quels (ex. « surfcasting », « bas de ligne », « القصبة »). Ne traduis jamais tout le texte.
 2. Fidélité : garde tous les faits, chiffres, dates, lieux, noms de spots, espèces, montages, appâts, horaires de marée et expériences racontées. N'ajoute aucun fait, conseil, chiffre, lieu, règle de pêche ou taille légale qui n'est pas dans le texte. Si une information manque, ne la complète pas.
 3. Voix de l'auteur : garde la première personne et les anecdotes. Améliore la forme, pas l'histoire.
 4. Liens : recopie chaque URL exactement, sur sa propre ligne.
@@ -86,42 +87,76 @@ def _clean(out: dict) -> dict:
 
 # --- Google Gemini --------------------------------------------------------------
 _gemini_model = None
+# Last model that answered: tried first, as the newest ones are often overloaded.
+_gemini_good = None
 
 
-def _gemini_call(path: str, payload=None) -> dict:
+def _gemini_call(path: str, payload=None, timeout: float = 90) -> dict:
     req = urllib.request.Request(
         f'{GEMINI_API}/{path}',
         data=None if payload is None else json.dumps(payload).encode(),
         headers={'Content-Type': 'application/json', 'x-goog-api-key': _key('GEMINI_API_KEY')},
         method='GET' if payload is None else 'POST')
-    with urllib.request.urlopen(req, timeout=90) as res:
+    with urllib.request.urlopen(req, timeout=timeout) as res:
         return json.loads(res.read())
 
 
-def gemini_model() -> str:
-    """GEMINI_MODEL, or the newest Flash model this key can use (Flash
-    models are in the free tier)."""
+def gemini_models() -> list:
+    """Flash models this key can use (they are in the free tier), newest
+    first; GEMINI_MODEL, when set, is tried before them."""
     global _gemini_model
-    if _key('GEMINI_MODEL'):
-        return _key('GEMINI_MODEL')
     if _gemini_model is None:
         models = _gemini_call('models?pageSize=200').get('models', [])
         flash = [m['name'].split('/')[-1] for m in models
                  if 'generateContent' in m.get('supportedGenerationMethods', [])
                  and 'flash' in m['name'] and 'lite' not in m['name']
                  and not any(w in m['name'] for w in ('preview', 'exp', 'image', 'tts', 'live', 'audio'))]
-        if not flash:
-            raise HTTPException(503, 'No Gemini model available for this key')
 
         def version(name):
-            nums = [int(p) if p.isdigit() else 0 for p in name.replace('gemini-', '').replace('-flash', '').split('.')]
-            return nums
-        _gemini_model = max(flash, key=version)
-    return _gemini_model
+            return [int(p) if p.isdigit() else 0
+                    for p in name.replace('gemini-', '').replace('-flash', '').split('.')]
+        _gemini_model = sorted(set(flash), key=version, reverse=True)
+    chosen = [_key('GEMINI_MODEL')] if _key('GEMINI_MODEL') else []
+    if _gemini_good and _gemini_good not in chosen:
+        chosen.append(_gemini_good)
+    out = chosen + [m for m in _gemini_model if m not in chosen]
+    if not out:
+        raise HTTPException(503, 'No Gemini model available for this key')
+    return out
+
+
+def gemini_model() -> str:
+    return gemini_models()[0]
 
 
 def gemini(prompt: str) -> dict:
-    global _gemini_model
+    """Tries the newest Flash model, then older ones while the newest are
+    overloaded (Google answers 503 or 429 at busy times)."""
+    global _gemini_model, _gemini_good
+    last = 503
+    deadline = time.monotonic() + 70
+    for model in gemini_models():
+        left = deadline - time.monotonic()
+        if left < 5:
+            break
+        try:
+            out = _gemini_once(model, prompt, timeout=min(20, left))
+            _gemini_good = model
+            return out
+        except urllib.error.HTTPError as e:
+            last = e.code
+            if e.code == 404:
+                _gemini_model = None  # model retired: list them again next time
+            elif e.code not in (429, 500, 503):
+                raise HTTPException(502, f'Gemini error {e.code}')
+        except (urllib.error.URLError, TimeoutError, OSError):
+            last = 503  # no answer in time: overloaded, try the next model
+        if model == _gemini_good:
+            _gemini_good = None
+    raise HTTPException(429 if last == 429 else 503, 'AI busy, try again in a minute')
+
+
+def _gemini_once(model: str, prompt: str, timeout: float = 20) -> dict:
     payload = {
         'systemInstruction': {'parts': [{'text': SYSTEM}]},
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
@@ -134,16 +169,7 @@ def gemini(prompt: str) -> dict:
             },
         },
     }
-    try:
-        res = _gemini_call(f'models/{gemini_model()}:generateContent', payload)
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            _gemini_model = None  # model retired: pick again next time
-        if e.code == 429:
-            raise HTTPException(429, 'AI busy, try again in a minute')
-        raise HTTPException(502, f'Gemini error {e.code}')
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise HTTPException(503, 'Gemini unreachable')
+    res = _gemini_call(f'models/{model}:generateContent', payload, timeout=timeout)
     try:
         text = ''.join(p.get('text', '') for p in res['candidates'][0]['content']['parts'])
         return json.loads(text)

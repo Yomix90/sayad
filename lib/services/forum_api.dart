@@ -323,11 +323,15 @@ class ForumApi {
     String body,
     String kind,
   ) async {
-    final j = await _post('/forum/ai/improve', {
-      'title': title,
-      'body': body,
-      'kind': kind,
-    }) as Map<String, dynamic>;
+    // The server may try several AI models in turn: wait longer than usual.
+    final res = await _client
+        .post(
+          _uri('/forum/ai/improve'),
+          headers: _headers,
+          body: jsonEncode({'title': title, 'body': body, 'kind': kind}),
+        )
+        .timeout(const Duration(seconds: 100));
+    final j = _decode(res) as Map<String, dynamic>;
     return (j['title'] as String, j['body'] as String);
   }
 

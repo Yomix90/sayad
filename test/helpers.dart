@@ -160,7 +160,7 @@ MockClient forumMockServer([List<http.BaseRequest>? calls]) => MockClient((req) 
       }
       if (path == '/forum/ai') return _json({'enabled': true});
       if (path == '/forum/ai/improve') {
-        final b = jsonDecode(req is http.Request ? req.body : '{}') as Map<String, dynamic>;
+        final b = jsonDecode(req.body) as Map<String, dynamic>;
         return _json({'title': 'Titre revu', 'body': '${b['body']} (revu)'});
       }
       if (path.endsWith('/react')) return _json({'reactions': {'like': 2, 'fish': 2}, 'my_reaction': 'fish'});
