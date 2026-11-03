@@ -16,7 +16,10 @@ import '../widgets/sub_page.dart';
 /// Weather map drawn by the app: colours for the chosen layer, arrows for
 /// wind and swell direction, and a slider over the next 72 hours.
 class WeatherMapScreen extends StatefulWidget {
-  const WeatherMapScreen({super.key});
+  const WeatherMapScreen({super.key, this.embedded = false});
+
+  /// Inside the Forecast tab: no page header of its own.
+  final bool embedded;
 
   @override
   State<WeatherMapScreen> createState() => _WeatherMapScreenState();
@@ -99,9 +102,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
     final grid = _grid;
     final scale = wxScales[_layer]!;
     final probeValue = grid == null || _probe == null ? null : grid.at(_probe!, _hour);
-    return SubPage(
-      title: t.weatherMap,
-      body: Column(children: [
+    final body = Column(children: [
         SizedBox(
           height: 58,
           child: ListView(
@@ -207,8 +208,8 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: Text(t.wxDataNote, style: TextStyle(fontSize: 11.5, color: p.muted)),
         ),
-      ]),
-    );
+      ]);
+    return widget.embedded ? body : SubPage(title: t.weatherMap, body: body);
   }
 
   String _format(double v) => switch (_layer) {

@@ -2103,6 +2103,12 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Réponse automatique de l\'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter.'**
   String get aiAnswerNote;
+
+  /// No description provided for @mapTab.
+  ///
+  /// In fr, this message translates to:
+  /// **'Carte'**
+  String get mapTab;
 }
 
 class _AppLocalizationsDelegate

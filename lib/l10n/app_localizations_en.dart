@@ -1069,4 +1069,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiAnswerNote =>
       'Automatic answer from the Sayad assistant: check it; anglers on the forum can add to it.';
+
+  @override
+  String get mapTab => 'Map';
 }

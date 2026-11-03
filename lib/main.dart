@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
 import 'l10n/app_localizations.dart';
-import 'screens/forecast_table_screen.dart';
+import 'screens/forecast_tabs_screen.dart';
 import 'screens/forum_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/map_screen.dart';
@@ -120,7 +120,7 @@ class _HomeShellState extends State<HomeShell> {
                   HomeScreen(),
                   TidesScreen(),
                   MapScreen(),
-                  ForecastTableScreen(),
+                  ForecastTabsScreen(),
                   ForumScreen(),
                   ToolsScreen(),
                 ],

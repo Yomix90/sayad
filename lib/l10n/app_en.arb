@@ -333,5 +333,6 @@
   "aiUndo": "Back to my text",
   "aiUnavailable": "AI is not available right now.",
   "aiAnswer": "AI answer",
-  "aiAnswerNote": "Automatic answer from the Sayad assistant: check it; anglers on the forum can add to it."
+  "aiAnswerNote": "Automatic answer from the Sayad assistant: check it; anglers on the forum can add to it.",
+  "mapTab": "Map"
 }

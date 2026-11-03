@@ -1066,4 +1066,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get aiAnswerNote =>
       'جواب تلقائي من مساعد الصياد: تحقق منه، ويمكن لصيادي المنتدى إضافة آرائهم.';
+
+  @override
+  String get mapTab => 'الخريطة';
 }

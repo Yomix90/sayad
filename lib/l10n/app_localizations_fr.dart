@@ -1078,4 +1078,7 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get aiAnswerNote =>
       'Réponse automatique de l\'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter.';
+
+  @override
+  String get mapTab => 'Carte';
 }

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:sayad/screens/forecast_tabs_screen.dart';
 import 'package:sayad/screens/forum_screen.dart';
 import 'package:sayad/screens/tools_screen.dart';
 import 'package:sayad/screens/weather_map_screen.dart';
@@ -165,6 +166,24 @@ void main() {
     final g = await WeatherGridService().load(WxLayer.wind, 30, -10, 31.5, -8.5);
     expect(g.values, isNotEmpty);
     expect(paths, ['api.example/weather/grid', 'api.open-meteo.com/v1/forecast']);
+  });
+
+  testWidgets('forecast tab switches to the weather map', (tester) async {
+    phoneView(tester);
+    WeatherGridService.testClient = weatherMockServer();
+    final state = await testState();
+    for (final lang in ['fr', 'ar']) {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(testApp(state, const Scaffold(body: ForecastTabsScreen()), lang: lang));
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text(lang == 'ar' ? 'الخريطة' : 'Carte'));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byType(Slider), findsOneWidget);
+      expect(find.text('Windy'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('tools grid and weather map render', (tester) async {

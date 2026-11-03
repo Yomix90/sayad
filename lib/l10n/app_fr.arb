@@ -423,5 +423,6 @@
   "aiUndo": "Revenir à mon texte",
   "aiUnavailable": "L'IA n'est pas disponible pour le moment.",
   "aiAnswer": "Réponse IA",
-  "aiAnswerNote": "Réponse automatique de l'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter."
+  "aiAnswerNote": "Réponse automatique de l'assistant Sayad : à vérifier ; les pêcheurs du forum peuvent compléter.",
+  "mapTab": "Carte"
 }
