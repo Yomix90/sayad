@@ -1,5 +1,5 @@
 # Dokploy: create a "Compose" service pointing to this repository with
-# Compose path = ./server/docker-compose.yml, set ADMIN_TOKEN in Environment,
+# Compose path = ./server/docker-compose.yml, set ADMIN_USER and ADMIN_PASSWORD in Environment,
 # then add your domain on the "sayad-api" service, port 8100.
 services:
   sayad-api:
@@ -8,7 +8,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in Dokploy environment}
+      # Login of /admin: user name and password.
+      ADMIN_USER: ${ADMIN_USER:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Optional token for scripts (X-Admin-Token header).
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       SAYAD_DB: /data/sayad.db
       OLD_APP_DIR: /data/old_app
       MEDIA_DIR: /data/media

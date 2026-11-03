@@ -2,6 +2,7 @@
 import os
 import sys
 import tempfile
+import time
 
 TMP = tempfile.mkdtemp()
 os.environ['SAYAD_DB'] = os.path.join(TMP, 'test.db')
@@ -516,6 +517,38 @@ def test_ai_answers_new_questions():
         ai.answer = real
         os.environ.pop('GEMINI_API_KEY', None)
         os.environ.pop('AI_ANSWERS', None)
+
+
+def test_admin_login_with_user_and_password():
+    server.ADMIN_USER, server.ADMIN_PASSWORD = 'yassine', 'Peche#2026'
+    server._logins.clear()
+    try:
+        assert client.get('/admin/api/login').json() == {'password': True, 'token': True}
+        bad = client.post('/admin/api/login', json={'username': 'yassine', 'password': 'nope'})
+        assert bad.status_code == 401
+        r = client.post('/admin/api/login', json={'username': ' Yassine ', 'password': 'Peche#2026'})
+        assert r.status_code == 200
+        session = r.json()['session']
+        assert client.get('/admin/api/stats', headers={'X-Admin-Token': session}).status_code == 200
+        # A forged or expired session is refused; the token still works for scripts.
+        forged = session[:-4] + 'abcd'
+        assert client.get('/admin/api/stats', headers={'X-Admin-Token': forged}).status_code == 401
+        old = server.new_session(now=time.time() - 13 * 3600)
+        assert client.get('/admin/api/stats', headers={'X-Admin-Token': old}).status_code == 401
+        assert client.get('/admin/api/stats', headers=ADMIN).status_code == 200
+        # Changing the password signs every session out.
+        server.ADMIN_PASSWORD = 'Autre#2026'
+        assert client.get('/admin/api/stats', headers={'X-Admin-Token': session}).status_code == 401
+        # 10 attempts per 15 minutes.
+        codes = [client.post('/admin/api/login', json={'username': 'x', 'password': 'y'}).status_code
+                 for _ in range(12)]
+        assert codes[-1] == 429
+    finally:
+        server.ADMIN_USER = server.ADMIN_PASSWORD = ''
+        server._logins.clear()
+    # Without user and password, only the token opens the dashboard.
+    assert client.get('/admin/api/login').json() == {'password': False, 'token': True}
+    assert client.post('/admin/api/login', json={'username': 'a', 'password': 'b'}).status_code == 400
 
 
 def test_dashboard_javascript_is_valid():

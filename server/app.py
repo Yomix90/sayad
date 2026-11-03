@@ -5,12 +5,15 @@ Public:  read approved spots/shops, submit new ones (kept pending).
 Admin:   dashboard + API under /admin (header X-Admin-Token).
 
 Environment:
-  ADMIN_TOKEN   password of the dashboard (required for /admin)
+  ADMIN_USER     user name of the dashboard
+  ADMIN_PASSWORD password of the dashboard
+  ADMIN_TOKEN    token for scripts (X-Admin-Token); also opens the dashboard
   SAYAD_DB      SQLite file (default: ./sayad.db)
   OLD_APP_DIR   folder scanned for files to import (default: ../old app)
   MEDIA_DIR     images of the forum (default: ./media)
 """
 import csv
+import hashlib
 import hmac
 import io
 import os
@@ -34,6 +37,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('SAYAD_DB', os.path.join(HERE, 'sayad.db'))
 # Tolerate quotes or spaces copied into the Dokploy environment.
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '').strip().strip('"\'').strip()
+ADMIN_USER = os.environ.get('ADMIN_USER', '').strip().strip('"\'').strip()
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '').strip().strip('"\'').strip()
+SESSION_HOURS = 12
 OLD_APP_DIR = os.environ.get('OLD_APP_DIR', os.path.join(HERE, '..', 'old app'))
 MEDIA_DIR = os.environ.get('MEDIA_DIR', os.path.join(HERE, 'media'))
 
@@ -150,10 +156,35 @@ def limit_submissions(request: Request) -> None:
     q.append(now)
 
 
+def _session_key() -> bytes:
+    # Changing the password or the token signs out every open session.
+    return hashlib.sha256(f'{ADMIN_USER}|{ADMIN_PASSWORD}|{ADMIN_TOKEN}'.encode()).digest()
+
+
+def new_session(now: Optional[float] = None) -> str:
+    """Signed dashboard session, valid SESSION_HOURS: 'expiry.signature'."""
+    expiry = int((now or time.time()) + SESSION_HOURS * 3600)
+    sig = hmac.new(_session_key(), f'admin|{expiry}'.encode(), hashlib.sha256).hexdigest()
+    return f's.{expiry}.{sig}'
+
+
+def _valid_session(value: str) -> bool:
+    try:
+        tag, expiry, sig = value.split('.')
+        expiry = int(expiry)
+    except ValueError:
+        return False
+    good = hmac.new(_session_key(), f'admin|{expiry}'.encode(), hashlib.sha256).hexdigest()
+    return tag == 's' and expiry > time.time() and hmac.compare_digest(sig, good)
+
+
 def require_admin(x_admin_token: str = Header(default='')) -> None:
+    """Accepts a dashboard session (from the login page) or ADMIN_TOKEN."""
     given = x_admin_token.strip().strip('"\'').strip()
-    if not ADMIN_TOKEN or not hmac.compare_digest(given, ADMIN_TOKEN):
-        raise HTTPException(401, 'Admin token required')
+    if (ADMIN_USER and ADMIN_PASSWORD and given.startswith('s.') and _valid_session(given)) \
+            or (ADMIN_TOKEN and hmac.compare_digest(given, ADMIN_TOKEN)):
+        return
+    raise HTTPException(401, 'Admin login required')
 
 
 # --- Models -----------------------------------------------------------------
@@ -234,6 +265,41 @@ def submit_shop(s: ShopIn):
             'VALUES (?,?,?,?,?, "pending", "app", ?)',
             (s.name.strip(), s.lat, s.lon, s.phone.strip(), s.city.strip(), int(time.time())))
     return {'id': cur.lastrowid, 'status': 'pending'}
+
+
+# --- Dashboard login -----------------------------------------------------------
+_logins: dict = defaultdict(deque)
+
+
+class AdminLogin(BaseModel):
+    username: str = Field(max_length=100)
+    password: str = Field(max_length=200)
+
+
+@app.get('/admin/api/login')
+def login_info():
+    """How the login page asks: user + password, or the token."""
+    return {'password': bool(ADMIN_USER and ADMIN_PASSWORD), 'token': bool(ADMIN_TOKEN)}
+
+
+@app.post('/admin/api/login')
+def admin_login(body: AdminLogin, request: Request):
+    ip = request.headers.get('x-real-ip') or (request.client.host if request.client else '?')
+    now = time.time()
+    q = _logins[ip]
+    while q and now - q[0] > 900:
+        q.popleft()
+    if len(q) >= 10:
+        raise HTTPException(429, 'Too many attempts, try again in 15 minutes')
+    q.append(now)
+    if not (ADMIN_USER and ADMIN_PASSWORD):
+        raise HTTPException(400, 'Set ADMIN_USER and ADMIN_PASSWORD on the server')
+    user_ok = hmac.compare_digest(body.username.strip().lower(), ADMIN_USER.lower())
+    pass_ok = hmac.compare_digest(body.password, ADMIN_PASSWORD)
+    if not (user_ok and pass_ok):
+        raise HTTPException(401, 'Wrong user name or password')
+    q.clear()
+    return {'session': new_session(), 'hours': SESSION_HOURS}
 
 
 # --- Dashboard page ---------------------------------------------------------

@@ -1,5 +1,5 @@
 # Dokploy (service "Compose", Compose Path ./docker-compose.yml).
-# Environment: ADMIN_TOKEN=... (required), SAYAD_DOMAIN=... (optional).
+# Environment: ADMIN_USER and ADMIN_PASSWORD (login of /admin), SAYAD_DOMAIN=... (optional).
 # The Traefik labels below publish the API on SAYAD_DOMAIN with HTTPS, so it
 # works even when no domain is added in Dokploy's "Domains" tab.
 services:
@@ -9,7 +9,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in Dokploy environment}
+      # Login of /admin: user name and password.
+      ADMIN_USER: ${ADMIN_USER:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Optional token for scripts (X-Admin-Token header).
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       SAYAD_DB: /data/sayad.db
       OLD_APP_DIR: /data/old_app
       MEDIA_DIR: /data/media

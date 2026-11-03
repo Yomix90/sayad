@@ -70,10 +70,21 @@
 
 <section id="login" class="login">
   <h2>Sayad · Administration</h2>
-  <p class="muted">Entrez le jeton administrateur (variable <code>ADMIN_TOKEN</code> du serveur).</p>
-  <input id="token" type="password" placeholder="Jeton administrateur" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
-  <button class="primary" id="loginBtn">Se connecter</button>
-  <p id="loginErr" class="muted"></p>
+  <form id="loginForm" autocomplete="on">
+    <div id="passwordLogin">
+      <label class="muted" for="user">Nom d'utilisateur</label>
+      <input id="user" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label class="muted" for="pass">Mot de passe</label>
+      <input id="pass" name="password" type="password" autocomplete="current-password">
+    </div>
+    <div id="tokenLogin" class="hidden">
+      <label class="muted" for="token">Jeton administrateur (<code>ADMIN_TOKEN</code>)</label>
+      <input id="token" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <button class="primary" id="loginBtn" type="submit" style="width:100%">Se connecter</button>
+  </form>
+  <p id="loginErr" style="color:var(--danger-ink)"></p>
+  <p style="margin:6px 0 0"><a href="#" id="loginSwitch" class="muted" style="font-size:13px"></a></p>
 </section>
 
 <div id="app" class="hidden">
@@ -281,12 +292,42 @@ async function api(path, opts = {}) {
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const statusLabel = { approved: 'Validé', pending: 'En attente', rejected: 'Refusé' };
 
+let useToken = false;
+function showLoginMode(info) {
+  // User + password when the server has them, else the token.
+  if (info) useToken = !info.password;
+  $('#passwordLogin').classList.toggle('hidden', useToken);
+  $('#tokenLogin').classList.toggle('hidden', !useToken);
+  $('#loginSwitch').textContent = useToken ? 'Se connecter avec un nom et un mot de passe' : 'Se connecter avec le jeton';
+  $('#loginSwitch').classList.toggle('hidden', !!info && !(info.password && info.token));
+  (useToken ? $('#token') : $('#user')).focus();
+}
+async function openSession() {
+  await api('/admin/api/stats');
+  sessionStorage.setItem('sayadToken', token);
+  $('#loginErr').textContent = '';
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); showTab(state.tab);
+}
 async function login() {
-  // Pasted tokens often carry spaces, line breaks or quotes.
-  const typed = $('#token').value.replace(/[\s"'«»“”]/g, '');
-  token = typed || token;
-  try { await api('/admin/api/stats'); sessionStorage.setItem('sayadToken', token); $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); showTab(state.tab); }
-  catch (e) { $('#loginErr').textContent = `Jeton refusé (${token.length} caractères saisis, le jeton en compte en général 48). Vérifiez qu'il n'y a pas de majuscule ajoutée par le clavier.`; }
+  $('#loginErr').textContent = '';
+  if (useToken) {
+    // Pasted tokens often carry spaces, line breaks or quotes.
+    token = $('#token').value.replace(/[\s"'«»“”]/g, '') || token;
+    try { await openSession(); }
+    catch (e) { $('#loginErr').textContent = `Jeton refusé (${token.length} caractères saisis).`; }
+    return;
+  }
+  const res = await fetch('/admin/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: $('#user').value, password: $('#pass').value }) });
+  if (!res.ok) {
+    $('#loginErr').textContent = res.status === 429 ? 'Trop de tentatives : réessayez dans 15 minutes.'
+      : res.status === 400 ? "La connexion par mot de passe n'est pas configurée (ADMIN_USER et ADMIN_PASSWORD)."
+      : "Nom d'utilisateur ou mot de passe incorrect.";
+    return;
+  }
+  token = (await res.json()).session;
+  $('#pass').value = '';
+  try { await openSession(); } catch (e) { $('#loginErr').textContent = 'Erreur : ' + e.message; }
 }
 function logout() { sessionStorage.removeItem('sayadToken'); token = ''; $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); }
 
@@ -501,8 +542,9 @@ async function refresh() {
 }
 
 // --- Events ---
-$('#loginBtn').onclick = login;
-$('#token').onkeydown = e => e.key === 'Enter' && login();
+$('#loginForm').onsubmit = e => { e.preventDefault(); login(); };
+$('#loginSwitch').onclick = e => { e.preventDefault(); useToken = !useToken; showLoginMode(); };
+fetch('/admin/api/login').then(r => r.json()).then(showLoginMode).catch(() => showLoginMode({ password: true, token: true }));
 $('#logout').onclick = logout;
 $('#tabs').onclick = e => e.target.dataset.tab && showTab(e.target.dataset.tab);
 $('#table').onchange = e => {
@@ -731,7 +773,7 @@ function openArticle(a, suggestion) {
 $('#fPrev').onclick = () => { forum.offset = Math.max(0, forum.offset - forum.limit); loadForum(); };
 $('#fNext').onclick = () => { forum.offset += forum.limit; loadForum(); };
 
-if (token) login();
+if (token) openSession().catch(() => logout());
 </script>
 </body>
 </html>
